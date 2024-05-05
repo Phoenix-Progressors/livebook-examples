@@ -1,0 +1,77 @@
+<!-- livebook:{"persist_outputs":true} -->
+
+# Learning Explorer
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.12.3"},
+  {:kino_explorer, "~> 0.1.18"},
+  {:explorer, "~> 0.8.1"}
+])
+```
+
+## Section
+
+```elixir
+df =
+  Explorer.DataFrame.new(
+    weekday: [
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday"
+    ],
+    team: ["A", "B", "C", "A", "B", "C", "A", "B", "C", "A"],
+    hour: [10, 9, 10, 10, 11, 15, 14, 16, 14, 16]
+  )
+```
+
+<!-- livebook:{"output":true} -->
+
+```text
+#Explorer.DataFrame<
+  Polars[10 x 3]
+  weekday string ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", ...]
+  team string ["A", "B", "C", "A", "B", ...]
+  hour s64 [10, 9, 10, 10, 11, ...]
+>
+```
+
+```elixir
+grouped = Explorer.DataFrame.group_by(df, "team")
+```
+
+<!-- livebook:{"output":true} -->
+
+```text
+#Explorer.DataFrame<
+  Polars[10 x 3]
+  weekday string ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", ...]
+  team string ["A", "B", "C", "A", "B", ...]
+  hour s64 [10, 9, 10, 10, 11, ...]
+>
+```
+
+```elixir
+Explorer.DataFrame.pivot_wider(grouped, "weekday", "hour")
+```
+
+<!-- livebook:{"output":true} -->
+
+```text
+#Explorer.DataFrame<
+  Polars[3 x 6]
+  team string ["A", "B", "C"]
+  Monday s64 [10, nil, 15]
+  Tuesday s64 [14, 9, nil]
+  Wednesday s64 [nil, 16, 10]
+  Thursday s64 [10, nil, 14]
+  Friday s64 [16, 11, nil]
+>
+```

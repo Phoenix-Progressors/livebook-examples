@@ -1,0 +1,636 @@
+<!-- livebook:{"persist_outputs":true} -->
+
+# mathocrat
+
+## Imports
+
+```elixir
+alias RazorNew.ClassItems.Test
+alias RazorNew.ClassRoom.Course
+alias RazorNew.Repo
+
+import Ecto.Query
+
+alias RazorNew.Accounts
+alias RazorNew.ClassItems.Test
+alias RazorNew.ClassItems.VideoClass
+alias RazorNew.ClassItems
+alias RazorNew.ClassRoom
+import RazorNew.ClassRoom
+import RazorNew.ClassItems
+alias RazorNew.Order
+alias RazorNew.Order.Subscription
+alias RazorNew.Order
+
+alias RazorNew.Accounts.User
+alias RazorNew.Accounts.UserToken
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+error: module Ecto.Query is not loaded and could not be found
+  mathocrat.livemd#cell:dwotm3uspkyahqe5:5
+
+```
+
+## create subscription for users
+
+#### has the user signed up?
+
+```elixir
+email = "someworks456+two@gmail.com"
+
+user = Accounts.get_user_by_email(email)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+#RazorNew.Accounts.User<
+  __meta__: #Ecto.Schema.Metadata<:loaded, "users">,
+  id: "76a577f4-aca5-4bb1-97c4-c785dacccf53",
+  email: "someworks456+two@gmail.com",
+  confirmed_at: nil,
+  role: :student,
+  user_meta: nil,
+  user_attribute: [
+    %RazorNew.Accounts.UserAttribute{
+      __meta__: #Ecto.Schema.Metadata<:loaded, "user_attributes">,
+      id: "b308e47b-eda4-419f-a257-5e409c31a731",
+      key: "college_pg",
+      value: "kgp",
+      user_id: "76a577f4-aca5-4bb1-97c4-c785dacccf53",
+      user: #Ecto.Association.NotLoaded<association :user is not loaded>,
+      is_deleted: false,
+      is_active: true,
+      user_attributes_meta: nil,
+      inserted_at: ~N[2023-05-15 17:19:14],
+      updated_at: ~N[2023-05-15 17:19:14]
+    },
+    %RazorNew.Accounts.UserAttribute{
+      __meta__: #Ecto.Schema.Metadata<:loaded, "user_attributes">,
+      id: "5a4bb74a-3979-4e75-bbaa-e77ef6baa11e",
+      key: "college_ug",
+      value: "kgp",
+      user_id: "76a577f4-aca5-4bb1-97c4-c785dacccf53",
+      user: #Ecto.Association.NotLoaded<association :user is not loaded>,
+      is_deleted: false,
+      is_active: true,
+      user_attributes_meta: nil,
+      inserted_at: ~N[2023-05-15 17:19:14],
+      updated_at: ~N[2023-05-15 17:19:14]
+    },
+    %RazorNew.Accounts.UserAttribute{
+      __meta__: #Ecto.Schema.Metadata<:loaded, "user_attributes">,
+      id: "9af369dc-25c8-445d-ad61-b9bdb263b40a",
+      key: "contact_number",
+      value: "9898989898",
+      user_id: "76a577f4-aca5-4bb1-97c4-c785dacccf53",
+      user: #Ecto.Association.NotLoaded<association :user is not loaded>,
+      is_deleted: false,
+      is_active: true,
+      user_attributes_meta: nil,
+      inserted_at: ~N[2023-05-15 17:19:14],
+      updated_at: ~N[2023-05-15 17:19:14]
+    },
+    %RazorNew.Accounts.UserAttribute{
+      __meta__: #Ecto.Schema.Metadata<:loaded, "user_attributes">,
+      id: "67f7992f-ac59-4cce-90f0-dbe9bc8dc628",
+      key: "cse_attempts",
+      value: "5",
+      user_id: "76a577f4-aca5-4bb1-97c4-c785dacccf53",
+      user: #Ecto.Association.NotLoaded<association :user is not loaded>,
+      is_deleted: false,
+      is_active: true,
+      user_attributes_meta: nil,
+      inserted_at: ~N[2023-05-15 17:19:14],
+      updated_at: ~N[2023-05-15 17:19:14]
+    },
+    %RazorNew.Accounts.UserAttribute{
+      __meta__: #Ecto.Schema.Metadata<:loaded, "user_attributes">,
+      id: "a7d9b332-f9b5-4373-857c-072d1ee56e49",
+      key: "father_name",
+      value: "awdhesh kumar tripathi",
+      user_id: "76a577f4-aca5-4bb1-97c4-c785dacccf53",
+      user: #Ecto.Association.NotLoaded<association :user is not loaded>,
+      is_deleted: false,
+      is_active: true,
+      user_attributes_meta: nil,
+      inserted_at: ~N[2023-05-15 17:19:14],
+      updated_at: ~N[2023-05-15 17:19:14]
+    },
+    %RazorNew.Accounts.UserAttribute{
+      __meta__: #Ecto.Schema.Metadata<:loaded, "user_attributes">,
+      id: "01534b04-8d49-4b77-afe6-cf9efd4ab2d1",
+      key: "full_name",
+      value: "abhishek tripathi",
+      user_id: "76a577f4-aca5-4bb1-97c4-c785dacccf53",
+      user: #Ecto.Association.NotLoaded<association :user is not loaded>,
+      is_deleted: false,
+      is_active: true,
+      user_attributes_meta: nil,
+      inserted_at: ~N[2023-05-15 17:19:14],
+      updated_at: ~N[2023-05-15 17:19:14]
+    },
+    %RazorNew.Accounts.UserAttribute{
+      __meta__: #Ecto.Schema.Metadata<:loaded, "user_attributes">,
+      id: "78e9bf9d-1f3d-42e5-8e0a-3a3e7a5c4b58",
+      key: "heard_about_us",
+      value: "afl",
+      user_id: "76a577f4-aca5-4bb1-97c4-c785dacccf53",
+      user: #Ecto.Association.NotLoaded<association :user is not loaded>,
+      is_deleted: false,
+      is_active: true,
+      user_attributes_meta: nil,
+      inserted_at: ~N[2023-05-15 17:19:14],
+      updated_at: ~N[2023-05-15 17:19:14]
+    },
+    %RazorNew.Accounts.UserAttribute{
+      __meta__: #Ecto.Schema.Metadata<:loaded, "user_attributes">,
+      id: "f916a798-b30a-48b6-85df-3680768a471a",
+      key: "mains_attempts",
+      value: "5",
+      user_id: "76a577f4-aca5-4bb1-97c4-c785dacccf53",
+      user: #Ecto.Association.NotLoaded<association :user is not loaded>,
+      is_deleted: false,
+      is_active: true,
+      user_attributes_meta: nil,
+      inserted_at: ~N[2023-05-15 17:19:14],
+      updated_at: ~N[2023-05-15 17:19:14]
+    },
+    %RazorNew.Accounts.UserAttribute{
+      __meta__: #Ecto.Schema.Metadata<:loaded, "user_attributes">,
+      id: "5f7aea01-eec2-4ed9-9085-a855be4b9cc7",
+      key: "suggestions",
+      value: "yes.",
+      user_id: "76a577f4-aca5-4bb1-97c4-c785dacccf53",
+      user: #Ecto.Association.NotLoaded<association :user is not loaded>,
+      is_deleted: false,
+      is_active: true,
+      user_attributes_meta: nil,
+      inserted_at: ~N[2023-05-15 17:19:14],
+      updated_at: ~N[2023-05-15 17:19:14]
+    },
+    %RazorNew.Accounts.UserAttribute{
+      __meta__: #Ecto.Schema.Metadata<:loaded, "user_attributes">,
+      id: "28614c1c-1a7d-48d7-9a35-1d59463a0e83",
+      key: "telegram_user_id",
+      value: "linked1321",
+      user_id: "76a577f4-aca5-4bb1-97c4-c785dacccf53",
+      user: #Ecto.Association.NotLoaded<association :user is not loaded>,
+      is_deleted: false,
+      is_active: true,
+      user_attributes_meta: nil,
+      inserted_at: ~N[2023-05-15 17:19:14],
+      updated_at: ~N[2023-05-15 17:19:14]
+    }
+  ],
+  inserted_at: ~N[2023-05-15 17:18:40],
+  updated_at: ~N[2023-07-24 11:17:25],
+  ...
+>
+```
+
+```elixir
+user.role
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:student
+```
+
+## Activate subscription
+
+```elixir
+course_list = ClassRoom.list_courses_only()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  %RazorNew.ClassRoom.Course{
+    __meta__: #Ecto.Schema.Metadata<:loaded, "courses">,
+    id: "b736c06e-aef1-4f50-b024-baab9cafa5f8",
+    long_description: "<div>5 sectional plus 10 full length tests</div>",
+    short_description: nil,
+    fees: 6500,
+    name: "Test Series for Mains 2023",
+    files: [
+      %RazorNew.File{
+        size: 191760,
+        url: "docs/pdfs/408d9058-59a7-41d8-82b8-139d6b51503f_0_CSE mains 2023.pdf",
+        title: "CSE mains 2023.pdf"
+      }
+    ],
+    tags: nil,
+    start_date: nil,
+    end_date: nil,
+    type: nil,
+    tests: #Ecto.Association.NotLoaded<association :tests is not loaded>,
+    classes: #Ecto.Association.NotLoaded<association :classes is not loaded>,
+    is_deleted: false,
+    is_active: true,
+    courses_meta: %{
+      "size" => 145593,
+      "title" => "wirow.pdf",
+      "url" => "c3d407ac-9c4b-4c13-8386-497558304b5f_0_wirow.pdf"
+    },
+    inserted_at: ~N[2023-05-31 17:56:08],
+    updated_at: ~N[2023-06-16 07:43:30]
+  },
+  %RazorNew.ClassRoom.Course{
+    __meta__: #Ecto.Schema.Metadata<:loaded, "courses">,
+    id: "b6f056c9-8429-4a57-bfe3-71b0d8b4d4aa",
+    long_description: "<div>The test Series is valid till 17th March, 2024<br><br></div>",
+    short_description: nil,
+    fees: 6200,
+    name: "YearLong Test Series for Mains 2024",
+    files: [
+      %RazorNew.File{
+        size: 190598,
+        url: "docs/pdfs/620922c4-040a-4add-8d30-a53b6bb5a525_0_Mathocrat Yearlong Test Series for Mains 2024.pdf",
+        title: "Mathocrat Yearlong Test Series for Mains 2024.pdf"
+      },
+      %RazorNew.File{
+        size: 2344528,
+        url: "docs/pdfs/287f8a67-94e5-4613-bfcc-0b8f541da41e_0_Christian Cachin, Rachid Guerraoui, Luis Rodrigues - Reliable and Secure Distributed Programming, Second Edition-Springer (2011).pdf",
+        title: "Christian Cachin, Rachid Guerraoui, Luis Rodrigues - Reliable and Secure Distributed Programming, Second Edition-Springer (2011).pdf"
+      }
+    ],
+    tags: nil,
+    start_date: nil,
+    end_date: nil,
+    type: nil,
+    tests: #Ecto.Association.NotLoaded<association :tests is not loaded>,
+    classes: #Ecto.Association.NotLoaded<association :classes is not loaded>,
+    is_deleted: false,
+    is_active: true,
+    courses_meta: nil,
+    inserted_at: ~N[2023-06-13 17:51:29],
+    updated_at: ~N[2023-06-16 13:06:24]
+  },
+  %RazorNew.ClassRoom.Course{
+    __meta__: #Ecto.Schema.Metadata<:loaded, "courses">,
+    id: "bf26daa9-1699-44dc-a300-1ee9f44cba31",
+    long_description: "<div>Start date: 16th May 2023<br>End Date: Mid November.<br>Recordings of classes are provided.           </div>",
+    short_description: nil,
+    fees: 36000,
+    name: "Foundation Course For Mathematics UPSC/CSE",
+    files: [
+      %RazorNew.File{
+        size: 150175,
+        url: "docs/pdfs/64e4b66c-644e-4eb4-a33e-67b54536da29_0_Mathocrat Foundation Course for Mains 2024 Brochure.pdf",
+        title: "Mathocrat Foundation Course for Mains 2024 Brochure.pdf"
+      }
+    ],
+    tags: nil,
+    start_date: nil,
+    end_date: nil,
+    type: nil,
+    tests: #Ecto.Association.NotLoaded<association :tests is not loaded>,
+    classes: #Ecto.Association.NotLoaded<association :classes is not loaded>,
+    is_deleted: false,
+    is_active: true,
+    courses_meta: nil,
+    inserted_at: ~N[2023-05-15 15:32:40],
+    updated_at: ~N[2023-07-05 15:51:14]
+  },
+  %RazorNew.ClassRoom.Course{
+    __meta__: #Ecto.Schema.Metadata<:loaded, "courses">,
+    id: "3bca95f6-c484-48a6-9bf5-43c044dd4a00",
+    long_description: "<div>Class Timing: 07:00 AM to 10:00AM<br>Start date: 24th July, 2023<br>Duration: 20 days<br>Classes : 5 days in a week</div>",
+    short_description: nil,
+    fees: 10000,
+    name: "Real Analysis & Calculus Module ",
+    files: [
+      %RazorNew.File{
+        size: 160026,
+        url: "docs/pdfs/080e5718-92dc-4dbf-998f-a8a1dd44b747_0_Real Analysis & Calculus Module.pdf",
+        title: "Real Analysis & Calculus Module.pdf"
+      }
+    ],
+    tags: nil,
+    start_date: nil,
+    end_date: nil,
+    type: nil,
+    tests: #Ecto.Association.NotLoaded<association :tests is not loaded>,
+    classes: #Ecto.Association.NotLoaded<association :classes is not loaded>,
+    is_deleted: false,
+    is_active: true,
+    courses_meta: nil,
+    inserted_at: ~N[2023-07-18 12:17:00],
+    updated_at: ~N[2023-07-18 12:17:27]
+  },
+  %RazorNew.ClassRoom.Course{
+    __meta__: #Ecto.Schema.Metadata<:loaded, "courses">,
+    id: "ae882178-f16f-449d-bc68-998eb186cdff",
+    long_description: "<div>It includes two open tests on UPSC CSE pattern to be held on 24th August, 2023.<br>1st paper at 9 AM and 2nd paper at 2PM.<br><br>The papers can be attempted at the offline centre of Mathocrat as well on the scheduled Date only.<br><br>Aspirants attempting the tests online must upload their answer scripts latest by 26th August 2023.The result of the test will be declared on 3rd September 2023.<br>Note: Aspirants already enrolled in the Mains Test series are NOT required to register for these tests as they are already part of these by default.</div>",
+    short_description: nil,
+    fees: 600,
+    name: "MATHOCRAT OPEN TESTS FOR MAINS 2023",
+    files: nil,
+    tags: nil,
+    start_date: nil,
+    end_date: nil,
+    type: nil,
+    tests: #Ecto.Association.NotLoaded<association :tests is not loaded>,
+    classes: #Ecto.Association.NotLoaded<association :classes is not loaded>,
+    is_deleted: false,
+    is_active: true,
+    courses_meta: nil,
+    inserted_at: ~N[2023-08-09 09:24:25],
+    updated_at: ~N[2023-08-09 09:27:50]
+  },
+  %RazorNew.ClassRoom.Course{
+    __meta__: #Ecto.Schema.Metadata<:loaded, "courses">,
+    id: "07f0f8fa-0f8f-44e8-8a31-52161da1cadf",
+    long_description: "<div>This course is part of foundation only. This is Not open for enrollment.</div>",
+    short_description: nil,
+    fees: 0,
+    name: "LPP",
+    files: nil,
+    tags: nil,
+    start_date: nil,
+    end_date: nil,
+    type: nil,
+    tests: #Ecto.Association.NotLoaded<association :tests is not loaded>,
+    classes: #Ecto.Association.NotLoaded<association :classes is not loaded>,
+    is_deleted: false,
+    is_active: true,
+    courses_meta: nil,
+    inserted_at: ~N[2023-08-05 08:25:37],
+    updated_at: ~N[2023-08-10 00:58:56]
+  }
+]
+```
+
+```elixir
+Enum.filter(course_list, fn
+  %{zoom_meeting_id: zoom_meeting_id} when is_integer(zoom_meeting_id) -> true
+  _ -> false
+end)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[]
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Add video to course
+
+```elixir
+# class_id = "9b8a1236-bdee-4606-b210-e6dc96c8c170"
+# url = "2023_08_03"
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+nil
+```
+
+```elixir
+# class = ClassItems.get_class!(class_id)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+nil
+```
+
+```elixir
+# # ASSUME - only one video per class. so, previous entries in class.files are overwritten.
+# RazorNew.ClassItems.update_class(class, %{
+#   files: [%RazorNew.File{title: url, url: url, size: 0}]
+# })
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+nil
+```
+
+```elixir
+start_date = DateTime.utc_now()
+end_date = start_date |> Timex.shift(hours: 3)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+~U[2023-08-18 10:58:54.651021Z]
+```
+
+```elixir
+foundation_course = "bf26daa9-1699-44dc-a300-1ee9f44cba31"
+real_course = "3bca95f6-c484-48a6-9bf5-43c044dd4a00"
+lpp_course = "07f0f8fa-0f8f-44e8-8a31-52161da1cadf"
+url = "2023_08_18_89938773263"
+# short_desc = "Real Analysis 13"
+short_desc = "LPP 07"
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"LPP 07"
+```
+
+```elixir
+# [real_course] 
+# [foundation_course, real_course]
+[foundation_course, lpp_course]
+|> Enum.map(fn x ->
+  RazorNew.ClassItems.create_class(x, %{
+    start_date: start_date,
+    end_date: end_date,
+    short_description: short_desc,
+    files: [%RazorNew.File{title: url, url: url, size: 0}]
+  })
+end)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"========= attrs ========"
+%{
+  end_date: ~U[2023-08-18 10:58:54.651021Z],
+  files: [
+    %RazorNew.File{
+      size: 0,
+      url: "2023_08_18_89938773263",
+      title: "2023_08_18_89938773263"
+    }
+  ],
+  short_description: "LPP 07",
+  start_date: ~U[2023-08-18 07:58:54.651021Z]
+}
+"========= attrs ========"
+%{
+  end_date: ~U[2023-08-18 10:58:54.651021Z],
+  files: [
+    %RazorNew.File{
+      size: 0,
+      url: "2023_08_18_89938773263",
+      title: "2023_08_18_89938773263"
+    }
+  ],
+  short_description: "LPP 07",
+  start_date: ~U[2023-08-18 07:58:54.651021Z]
+}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  ok: %RazorNew.ClassItems.VideoClass{
+    __meta__: #Ecto.Schema.Metadata<:loaded, "classes">,
+    id: "61dfceca-0fe3-46af-8aea-f79abae865ac",
+    files: [%RazorNew.File{size: 0, url: "2023_08_18_89938773263", title: "2023_08_18_89938773263"}],
+    pdf_files: nil,
+    long_description: nil,
+    short_description: "LPP 07",
+    start_date: ~U[2023-08-18 07:58:54Z],
+    end_date: ~U[2023-08-18 10:58:54Z],
+    zoom_link: nil,
+    zoom_meeting_id: nil,
+    allowed_playback_duration: nil,
+    mpd_link: nil,
+    course_id: "bf26daa9-1699-44dc-a300-1ee9f44cba31",
+    course: #Ecto.Association.NotLoaded<association :course is not loaded>,
+    is_deleted: false,
+    is_active: true,
+    classes_meta: nil,
+    inserted_at: ~N[2023-08-18 07:58:56],
+    updated_at: ~N[2023-08-18 07:58:56]
+  },
+  ok: %RazorNew.ClassItems.VideoClass{
+    __meta__: #Ecto.Schema.Metadata<:loaded, "classes">,
+    id: "8855b5f7-4d4a-48b4-b982-468f873ff3e9",
+    files: [%RazorNew.File{size: 0, url: "2023_08_18_89938773263", title: "2023_08_18_89938773263"}],
+    pdf_files: nil,
+    long_description: nil,
+    short_description: "LPP 07",
+    start_date: ~U[2023-08-18 07:58:54Z],
+    end_date: ~U[2023-08-18 10:58:54Z],
+    zoom_link: nil,
+    zoom_meeting_id: nil,
+    allowed_playback_duration: nil,
+    mpd_link: nil,
+    course_id: "07f0f8fa-0f8f-44e8-8a31-52161da1cadf",
+    course: #Ecto.Association.NotLoaded<association :course is not loaded>,
+    is_deleted: false,
+    is_active: true,
+    classes_meta: nil,
+    inserted_at: ~N[2023-08-18 07:58:56],
+    updated_at: ~N[2023-08-18 07:58:56]
+  }
+]
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## User tokens
+
+```elixir
+user_tokens =
+  Repo.all(
+    from(t in UserToken, where: t.inserted_at > ^Timex.shift(DateTime.utc_now(), hours: -2))
+  )
+  |> Enum.map(& &1.user_id)
+  |> Enum.map(fn id ->
+    Repo.all(from(u in User, where: u.id == ^id, select: %{email: u.email, id: u.id}))
+  end)
+  |> List.flatten()
+  |> Enum.count()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+5
+```
+
+```elixir
+# Stream.resource(
+
+# fn -> Repo.all(
+#     from(t in UserToken, where: t.inserted_at > ^Timex.shift(DateTime.utc_now(), hours: -1))
+#   ) end, 
+
+#   fn users -> 
+#     Stream.map(users,& &1.user_id) 
+#     |> Stream.map(fn id ->
+#       Repo.all(from(u in User, where: u.id == ^id, select: %{email: u.email, id: u.id}))
+#       end)
+#   end, fn x -> x end)
+#   |> Stream.run()
+#   |> Enum.take(10)
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Add Teacher to course
+
+```elixir
+Accounts.list_users() |> Enum.filter(&String.contains?(&1.email, "mamg"))
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  #RazorNew.Accounts.User<
+    __meta__: #Ecto.Schema.Metadata<:loaded, "users">,
+    id: "7a32cf8c-9502-4da2-97af-cbe234919de1",
+    email: "mamgurjar@gmail.com",
+    confirmed_at: ~N[2023-05-16 01:20:09],
+    role: :teacher,
+    user_meta: nil,
+    user_attribute: [],
+    inserted_at: ~N[2023-05-15 16:54:48],
+    updated_at: ~N[2023-07-24 10:09:46],
+    ...
+  >
+]
+```
+
+```elixir
+user = Accounts.get_user_by_email("mamgurjar@gmail.com")
+Accounts.update_user_role(user, %{"role" => "teacher"})
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok,
+ #RazorNew.Accounts.User<
+   __meta__: #Ecto.Schema.Metadata<:loaded, "users">,
+   id: "7a32cf8c-9502-4da2-97af-cbe234919de1",
+   email: "mamgurjar@gmail.com",
+   confirmed_at: ~N[2023-05-16 01:20:09],
+   role: :teacher,
+   user_meta: nil,
+   user_attribute: [],
+   inserted_at: ~N[2023-05-15 16:54:48],
+   updated_at: ~N[2023-07-24 10:09:46],
+   ...
+ >}
+```
+
+Find User status
+
+```elixir
+
+```

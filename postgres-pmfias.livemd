@@ -1,0 +1,126 @@
+<!-- livebook:{"app_settings":{"auto_shutdown_ms":3600000,"output_type":"rich","slug":"pmf-analytics","zero_downtime":true},"file_entries":[{"name":"2024-03-04_13_07_24.db","type":"attachment"},{"file":{"file_system_id":"local","file_system_type":"local","path":"/data/2024-03-05_01_41_06.db"},"name":"2024-03-05_01_41_06.db","type":"file"},{"file":{"file_system_id":"local","file_system_type":"local","path":"/data/2024-03-06_02_06_35.db"},"name":"2024-03-06_02_06_35.db","type":"file"},{"file":{"file_system_id":"local","file_system_type":"local","path":"/data/2024-03-06_04_57_41.db"},"name":"2024-03-06_04_57_41.db","type":"file"},{"name":"2024-0304_08-17-15_pyq_ratta_dev.sql","type":"attachment"},{"name":"my.db","type":"attachment"}],"persist_outputs":true} -->
+
+# livedb analysis postgres
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.12.0"},
+  {:kino_db, "~> 0.2.3"},
+  {:exqlite, "~> 0.11.0"},
+  {:postgrex, "~> 0.17"}
+])
+```
+
+## Section
+
+<!-- livebook:{"attrs":"eyJkYXRhYmFzZSI6InB5cV9yYXR0YV9kZXYiLCJob3N0bmFtZSI6ImxvY2FsaG9zdCIsInBhc3N3b3JkX3NlY3JldCI6IlBPU1RHUkVTX1BBU1NXT1JEIiwicG9ydCI6NTQzMiwidHlwZSI6InBvc3RncmVzIiwidXNlX2lwdjYiOmZhbHNlLCJ1c2Vfc3NsIjpmYWxzZSwidXNlcm5hbWUiOiJwb3N0Z3JlcyIsInZhcmlhYmxlIjoiY29ubiJ9","chunks":null,"kind":"Elixir.KinoDB.ConnectionCell","livebook_object":"smart_cell"} -->
+
+```elixir
+opts = [
+  hostname: "localhost",
+  port: 5432,
+  username: "postgres",
+  password: System.fetch_env!("LB_POSTGRES_PASSWORD"),
+  database: "pyq_ratta_dev"
+]
+
+{:ok, conn} = Kino.start_child({Postgrex, opts})
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok, #PID<0.1845.0>}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+
+05:03:41.128 [error] Postgrex.Protocol (#PID<0.1847.0>) failed to connect: ** (DBConnection.ConnectionError) tcp connect (localhost:5432): connection refused - :econnrefused
+
+05:03:42.916 [error] Postgrex.Protocol (#PID<0.1847.0>) failed to connect: ** (DBConnection.ConnectionError) tcp connect (localhost:5432): connection refused - :econnrefused
+
+05:03:46.476 [error] Postgrex.Protocol (#PID<0.1847.0>) failed to connect: ** (DBConnection.ConnectionError) tcp connect (localhost:5432): connection refused - :econnrefused
+```
+
+```elixir
+# database_path = Kino.FS.file_path("2024-03-06_04_57_41.db")
+# {:ok, conn} = Kino.start_child({Exqlite, database: database_path})
+
+# Exqlite.query!(conn, "PRAGMA table_list", [])
+```
+
+```elixir
+Kino.Markdown.new("""
+### Number of Users who took the latest quiz
+""")
+```
+
+```elixir
+query = "SELECT COUNT(DISTINCT uqr.user_id) AS number_of_students
+FROM user_quiz_response uqr
+JOIN (
+    SELECT id
+    FROM quiz
+    ORDER BY created_at DESC
+    LIMIT 1
+) latest_quiz ON uqr.quiz_id = latest_quiz.id"
+
+Exqlite.query!(conn, query, [])
+```
+
+```elixir
+Kino.Markdown.new("""
+### #students in all quiz
+""")
+```
+
+```elixir
+query = "SELECT 
+    SUBSTR(q.id, 0, 8) as quiz_id, 
+    COUNT(DISTINCT uqr.user_id) AS number_of_students,
+    COUNT(DISTINCT qq.question_id) AS number_of_questions,
+    q.created_at as created_at
+FROM quiz q
+LEFT JOIN user_quiz_response uqr ON q.id = uqr.quiz_id
+LEFT JOIN quiz_questions qq ON q.id = qq.quiz_id
+GROUP BY q.id
+ORDER BY q.id"
+
+Exqlite.query!(conn, query, [])
+```
+
+```elixir
+Kino.Markdown.new("""
+### #percent of students who got a question right
+
+List of questions followed by `percentage_correct`
+
+Please use `show` button on the able to show all entries
+""")
+```
+
+```elixir
+query = """
+SELECT 
+    SUBSTR(qq.quiz_id, 0, 8) as quiz_id ,
+    SUBSTR(q.short_description, 0, 9) as quiz_day,
+    qq.question_number,
+    ROUND(
+      (SUM(CASE WHEN LOWER(q.correct_answer_text) = LOWER(uqr.attempted_answer) THEN 1 ELSE 0 END) * 100.0) / COUNT(uqr.user_id),
+      1 ) AS percentage_correct,
+    COUNT(DISTINCT uqr.user_id) AS students_attempted
+FROM quiz_questions qq
+JOIN question q ON qq.question_id = q.id
+LEFT JOIN user_quiz_response uqr ON qq.question_id = uqr.question_id AND qq.quiz_id = uqr.quiz_id
+WHERE qq.quiz_id != '6d3d5600-6c11-46c0-acc5-2d3cc422313a'
+GROUP BY qq.quiz_id, qq.question_id
+ORDER BY q.created_at, qq.question_number
+
+"""
+
+Exqlite.query!(conn, query, [])
+```
+
+<!-- livebook:{"offset":4096,"stamp":{"token":"XCP.3MBtmziuOqIhOkeoVeOQCWQ0WOxOYDHHYO1T0PTSThawXBk4fnFDttUCRSfU1C73rHKuU2Yq868Uci2raxk4aVaeNDdUHfM4rCMa2mq00CGY6j4G9xVSy5TdkBAgE9egDP6tsfjTApLSVeRh5ahdYyYVh6AHWEXj4sGZftHiWmmj7BBCz3w7Q4OTW9vk78W2QPJwrppEG0igG-WrbtHQy39D","version":2}} -->

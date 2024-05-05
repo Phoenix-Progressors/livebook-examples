@@ -1,0 +1,202 @@
+<!-- livebook:{"app_settings":{"slug":"mathocrat"},"persist_outputs":true} -->
+
+# Upload Video to RazorNew
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.10.0"}
+])
+```
+
+## Utilities
+
+```elixir
+defmodule DistUtils do
+  def connect_remote(node, cookie) do
+    Node.set_cookie(node, cookie)
+    Node.connect(node)
+    :persistent_term.put(:remote_node, node)
+  end
+
+  defmacro remotely!(fun) do
+    quote bind_quoted: [fun: fun] do
+      node = :persistent_term.get(:remote_node)
+
+      myself = self()
+      ref = make_ref()
+
+      {pid, monitor_ref} =
+        Node.spawn_monitor(node, fn ->
+          result = fun.()
+          send(myself, {:result, ref, result})
+        end)
+
+      receive do
+        {:result, ^ref, result} ->
+          result
+
+        {:DOWN, ^monitor_ref, :process, ^pid, reason} ->
+          raise "failed with reason: #{inspect(reason)}"
+      end
+    end
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, DistUtils, <<70, 79, 82, 49, 0, 0, 11, ...>>, {:remotely!, 1}}
+```
+
+### How to connect to remote node?
+
+* Using module above 
+  > connect with
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+require DistUtils
+
+DistUtils.connect_remote(node, cookie)
+```
+
+> and run code on the remote node:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+DistUtils.remotely!(fn ->
+  Foo |> Repo.aggregate(:count)
+end)
+```
+
+* Direct call to server
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+:erpc.call(node, fn ->
+  Foo.foo()
+end)
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Kino
+
+```elixir
+frame = Kino.Frame.new()
+```
+
+```elixir
+name = Kino.Input.text("Name")
+message = Kino.Input.textarea("Message")
+
+form =
+  Kino.Control.form([name: name, message: message], submit: "Send", reset_on_submit: [:message])
+```
+
+```elixir
+Kino.listen(form, fn %{data: %{name: name, message: message}, origin: origin} ->
+  content = Kino.Markdown.new("**#{name}**: #{message} ")
+  Kino.Frame.append(frame, content)
+end)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+warning: variable "origin" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  mathocrat_remote.livemd#cell:z3tltmyuxheufyilpobbv7jxasaa74ul:1
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:ok
+```
+
+### Connecting with Mathocrat
+
+```elixir
+require DistUtils
+node = :"mathocrat2@fdaa:0:3598:a7b:a7:7468:552c:2"
+cookie = :"mathocrat-dev-juice"
+
+DistUtils.connect_remote(node, cookie)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:ok
+```
+
+```elixir
+defmodule MathocratUtils do
+  defmacro aliases() do
+    quote do
+      alias RazorNew.ClassItems.Test
+      alias RazorNew.ClassRoom.Course
+      alias RazorNew.Repo
+
+      import Ecto.Query
+
+      alias RazorNew.Accounts
+      alias RazorNew.ClassItems.Test
+      alias RazorNew.ClassItems.VideoClass
+      alias RazorNew.ClassItems
+      alias RazorNew.ClassRoom
+      import RazorNew.ClassRoom
+      import RazorNew.ClassItems
+      alias RazorNew.Order
+      alias RazorNew.Order.Subscription
+      alias RazorNew.Order
+
+      alias RazorNew.Accounts.User
+      alias RazorNew.Accounts.UserToken
+    end
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, MathocratUtils, <<70, 79, 82, 49, 0, 0, 8, ...>>, {:aliases, 0}}
+```
+
+```elixir
+{node, cookie}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:"mathocrat2@fdaa:0:3598:a7b:a7:7468:552c:2", :"mathocrat-dev-juice"}
+```
+
+```elixir
+# :erpc.call(node, fn ->
+#   # RazorNew.ClassRoom.list_courses()
+#   0
+# end)
+```
+
+```elixir
+# DistUtils.remotely!(fn ->
+#   # require MathocratUtils.aliases()
+#   RazorNew.ClassRoom.list_courses()
+# end)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+
+08:06:06.009 [error] Process #PID<21738.2530.18> on node :"mathocrat2@fdaa:0:3598:a7b:a7:7468:552c:2" raised an exception
+** (BadFunctionError) function #Function<43.3316493/0 in :erl_eval.expr/6> is invalid, likely because it points to an old version of the code
+    :erlang.apply/2
+```

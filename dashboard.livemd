@@ -1,0 +1,165 @@
+<!-- livebook:{"app_settings":{"auto_shutdown_ms":3600000,"output_type":"rich","slug":"pmfias-subscriber","zero_downtime":true},"persist_outputs":true} -->
+
+# Dashboard Subscribers
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.12.3"},
+  {:vega_lite, "~> 0.1.8"},
+  {:csv, "~> 3.2"},
+  {:explorer, "~> 0.8.0"},
+  {:kino_explorer, "~> 0.1.18"},
+  {:tzdata, "~> 1.0.1"}
+
+  # {:csvlixir, "~> 2.0"}
+])
+```
+
+## Section
+
+```elixir
+Calendar.put_time_zone_database(Tzdata.TimeZoneDatabase)
+# config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:ok
+```
+
+```elixir
+button = Kino.Control.button("PMFIAS Subscribers")
+```
+
+```elixir
+frame = Kino.Frame.new()
+```
+
+```elixir
+Kino.listen(button, fn _event ->
+  Kino.Frame.clear(frame)
+  require Explorer.DataFrame
+  # list = File.stream!("pmfias_channel.csv") 
+  # |> CSV.decode!
+  # # |> IO.inspect()
+  # |> Enum.to_list()
+  # |> Enum.map(fn [k,v] -> 
+  # %{subscribers: k, timestamp: v}  
+
+  #  end)
+
+  df =
+    Explorer.DataFrame.from_csv!("pmfias_channel.csv", header: false)
+    |> Explorer.DataFrame.distinct(["column_1"], keep_all: true)
+    |> Explorer.DataFrame.group_by(["column_1"])
+
+  #   |> Explorer.DataFrame.aggregate([
+  #   first_column2: Explorer.DataFrame.select(df, "column_2"),
+  #   last_column2: Explorer.DataFrame.select(df, "column_2")
+  # ])
+
+  # |> Explorer.DataFrame.mutate_with(fn data -> 
+  # [column_3: ]
+  # end )
+  # Explorer.DataFrame.put(df, :date_column, Explorer.Series.transform(df["column_2"], &Utils.parse_datetime/1 ))
+  Kino.Frame.render(frame, df)
+  # import Kino.Shorts
+  # data_table(list)
+end)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+#PID<0.1752.0>
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+
+10:15:12.033 [debug] Tzdata polling for update.
+
+10:15:12.590 [info] tzdata release in place is from a file last modified Wed, 21 Oct 2020 18:40:20 GMT. Release file on server was last modified Thu, 01 Feb 2024 18:40:48 GMT.
+
+10:15:12.590 [debug] Tzdata downloading new data from https://data.iana.org/time-zones/tzdata-latest.tar.gz
+
+10:15:13.177 [debug] Tzdata data downloaded. Release version 2024a.
+
+10:15:13.725 [info] Tzdata has updated the release from 2020d to 2024a
+
+10:15:13.725 [debug] Tzdata deleting ETS table for version 2020d
+
+10:15:13.727 [debug] Tzdata deleting ETS table file for version 2020d
+
+01:15:13.662 [debug] Tzdata polling for update.
+
+01:15:14.316 [debug] Tzdata polling shows the loaded tz database is up to date.
+
+02:15:14.325 [debug] Tzdata polling for update.
+
+02:15:14.922 [debug] Tzdata polling shows the loaded tz database is up to date.
+
+03:15:14.931 [debug] Tzdata polling for update.
+
+03:15:15.524 [debug] Tzdata polling shows the loaded tz database is up to date.
+
+04:15:15.532 [debug] Tzdata polling for update.
+
+04:15:16.334 [debug] Tzdata polling shows the loaded tz database is up to date.
+
+00:15:16.342 [debug] Tzdata polling for update.
+
+00:15:16.933 [debug] Tzdata polling shows the loaded tz database is up to date.
+
+01:15:16.941 [debug] Tzdata polling for update.
+
+01:15:17.593 [debug] Tzdata polling shows the loaded tz database is up to date.
+
+02:15:17.601 [debug] Tzdata polling for update.
+
+02:15:18.246 [debug] Tzdata polling shows the loaded tz database is up to date.
+
+03:15:18.255 [debug] Tzdata polling for update.
+
+03:15:18.847 [debug] Tzdata polling shows the loaded tz database is up to date.
+
+04:15:18.854 [debug] Tzdata polling for update.
+
+04:15:19.447 [debug] Tzdata polling shows the loaded tz database is up to date.
+
+00:15:19.453 [debug] Tzdata polling for update.
+
+00:15:19.960 [debug] Tzdata polling shows the loaded tz database is up to date.
+
+01:15:19.967 [debug] Tzdata polling for update.
+
+01:15:20.567 [debug] Tzdata polling shows the loaded tz database is up to date.
+
+02:15:20.575 [debug] Tzdata polling for update.
+
+02:15:21.167 [debug] Tzdata polling shows the loaded tz database is up to date.
+
+03:15:21.176 [debug] Tzdata polling for update.
+
+03:15:21.678 [debug] Tzdata polling shows the loaded tz database is up to date.
+
+```
+
+```elixir
+# defmodule Utils do
+#   def parse_datetime(string) do
+#     string |> IO.inspect(label: "hi")
+#     # This is an example, adjust the parsing based on your actual datetime format
+#     {:ok, val, _} = DateTime.from_iso8601(string)
+#     DateTime.shift_zone!(val, "Asia/Kolkata")
+#   end
+# end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+nil
+```

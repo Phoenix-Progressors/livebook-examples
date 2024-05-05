@@ -1,0 +1,29 @@
+<!-- livebook:{"persist_outputs":true} -->
+
+# Trying Rambla
+
+```elixir
+Mix.install(
+  [
+    {:rambla, "~> 1.2"}
+  ],
+  config: [
+    rambla: [
+      clickhouse: [
+        connections: [
+          conn_1: "http://default:password@host-master-1:8123/database"
+        ],
+        channels: [
+          chan_1: [connection: :conn_1]
+        ]
+      ]
+    ]
+  ]
+)
+```
+
+## Section
+
+```elixir
+
+```

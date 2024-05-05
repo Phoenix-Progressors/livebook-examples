@@ -1,0 +1,1134 @@
+<!-- livebook:{"app_settings":{"output_type":"rich","slug":"pmfsubscribers","zero_downtime":true},"persist_outputs":true} -->
+
+# PMFIAS Subscribers
+
+```elixir
+Mix.install([
+  {:req, "~> 0.4.11"},
+  {:floki, "~> 0.35.4"},
+  {:csv, "~> 3.2"},
+  {:explorer, "~> 0.8.0"}
+])
+```
+
+## Section
+
+```elixir
+defmodule H do
+  def url, do: "https://t.me/pmfias_channel"
+
+  def subscribers([]), do: subscribers(url: url())
+
+  def subscribers(url: url) do
+    %{body: body} = Req.get!(url)
+
+    Floki.parse_document!(body)
+    |> Floki.find(".tgme_page_extra")
+    |> Floki.text()
+  end
+
+  def update_csv(name \\ "pmfias.csv", opts \\ []) do
+    content =
+      [[subscribers(opts), DateTime.utc_now() |> DateTime.to_string()]]
+      |> CSV.encode()
+      |> Enum.to_list()
+
+    content |> IO.inspect(label: "content")
+    File.write!(name, content, [:append])
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, H, <<70, 79, 82, 49, 0, 0, 11, ...>>, {:update_csv, 2}}
+```
+
+```elixir
+defmodule Updater do
+  use GenServer, restart: :permanent
+
+  # Callbacks
+
+  def get(name) do
+    GenServer.call(name, :get)
+  end
+
+  @impl true
+  def init(%{filename: filename, url: url} = args) do
+    # initial_state = String.split(elements, ",", trim: true)
+    Process.send_after(self(), :poll, 10)
+    schedule_send()
+    {:ok, Map.merge(args, %{poll_count: 0})}
+  end
+
+  @impl true
+  def handle_info(:poll, %{poll_count: poll_count} = state) do
+    H.update_csv(state.filename, url: state.url)
+    {state.filename, state.url} |> IO.inspect(label: "counter: #{poll_count}")
+    schedule_send()
+    {:noreply, Map.merge(state, %{poll_count: poll_count + 1})}
+  end
+
+  def handle_call(:get, from, state) do
+    {:reply, state, state}
+  end
+
+  def schedule_send(), do: Process.send_after(self(), :poll, 300 * 1000)
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+warning: variable "filename" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  pmfias_monitor.livemd#cell:m7bufmqgxyjnxw7l:11: Updater.init/1
+
+warning: variable "url" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  pmfias_monitor.livemd#cell:m7bufmqgxyjnxw7l:11: Updater.init/1
+
+warning: variable "from" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  pmfias_monitor.livemd#cell:m7bufmqgxyjnxw7l:26: Updater.handle_call/3
+
+warning: module attribute @impl was not set for function handle_call/3 callback (specified in GenServer). This either means you forgot to add the "@impl true" annotation before the definition or that you are accidentally overriding this callback
+  pmfias_monitor.livemd#cell:m7bufmqgxyjnxw7l:26: Updater (module)
+
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Updater, <<70, 79, 82, 49, 0, 0, 20, ...>>, {:schedule_send, 0}}
+```
+
+```elixir
+{:ok, pid} =
+  GenServer.start_link(
+    Updater,
+    %{filename: "pmfias_channel.csv", url: "https://t.me/pmfias_channel"},
+    name: :PMFIAS_Channel4
+  )
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok, #PID<0.1926.0>}
+```
+
+```elixir
+Updater.get(:PMFIAS_Channel4)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%{filename: "pmfias_channel.csv", url: "https://t.me/pmfias_channel", poll_count: 0}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+...
+counter: 3561: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 696 subscribers,2024-04-27 14:38:18.024403Z\r\n"]
+counter: 3562: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 698 subscribers,2024-04-27 14:43:18.034443Z\r\n"]
+counter: 3563: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 698 subscribers,2024-04-27 14:43:18.060025Z\r\n"]
+counter: 3564: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 700 subscribers,2024-04-27 14:48:18.057529Z\r\n"]
+counter: 3565: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 700 subscribers,2024-04-27 14:48:18.084114Z\r\n"]
+counter: 3566: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 700 subscribers,2024-04-27 14:53:18.087861Z\r\n"]
+counter: 3567: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 700 subscribers,2024-04-27 14:53:18.113344Z\r\n"]
+counter: 3568: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 700 subscribers,2024-04-27 14:58:18.114457Z\r\n"]
+counter: 3569: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 700 subscribers,2024-04-27 14:58:18.138006Z\r\n"]
+counter: 3570: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 703 subscribers,2024-04-27 15:03:18.141287Z\r\n"]
+counter: 3571: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 703 subscribers,2024-04-27 15:03:18.164677Z\r\n"]
+counter: 3572: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 703 subscribers,2024-04-27 15:08:18.169060Z\r\n"]
+counter: 3573: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 703 subscribers,2024-04-27 15:08:18.195531Z\r\n"]
+counter: 3574: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 703 subscribers,2024-04-27 15:13:18.194555Z\r\n"]
+counter: 3575: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 703 subscribers,2024-04-27 15:13:18.218074Z\r\n"]
+counter: 3576: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 702 subscribers,2024-04-27 15:18:18.220491Z\r\n"]
+counter: 3577: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 702 subscribers,2024-04-27 15:18:18.244326Z\r\n"]
+counter: 3578: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 701 subscribers,2024-04-27 15:23:18.244897Z\r\n"]
+counter: 3579: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 701 subscribers,2024-04-27 15:23:18.269761Z\r\n"]
+counter: 3580: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 701 subscribers,2024-04-27 15:28:18.269215Z\r\n"]
+counter: 3581: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 701 subscribers,2024-04-27 15:28:18.293802Z\r\n"]
+counter: 3582: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 703 subscribers,2024-04-27 15:33:18.294371Z\r\n"]
+counter: 3583: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 703 subscribers,2024-04-27 15:33:18.319718Z\r\n"]
+counter: 3584: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 703 subscribers,2024-04-27 15:38:18.319271Z\r\n"]
+counter: 3585: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 703 subscribers,2024-04-27 15:38:18.342940Z\r\n"]
+counter: 3586: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 703 subscribers,2024-04-27 15:43:18.344123Z\r\n"]
+counter: 3587: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 703 subscribers,2024-04-27 15:43:18.367945Z\r\n"]
+counter: 3588: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 703 subscribers,2024-04-27 15:48:18.374178Z\r\n"]
+counter: 3589: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 703 subscribers,2024-04-27 15:48:18.399643Z\r\n"]
+counter: 3590: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 704 subscribers,2024-04-27 15:53:18.402300Z\r\n"]
+counter: 3591: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 704 subscribers,2024-04-27 15:53:18.427740Z\r\n"]
+counter: 3592: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 704 subscribers,2024-04-27 15:58:18.425959Z\r\n"]
+counter: 3593: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 704 subscribers,2024-04-27 15:58:18.450277Z\r\n"]
+counter: 3594: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 704 subscribers,2024-04-27 16:03:18.449935Z\r\n"]
+counter: 3595: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 704 subscribers,2024-04-27 16:03:18.472983Z\r\n"]
+counter: 3596: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 704 subscribers,2024-04-27 16:08:18.475914Z\r\n"]
+counter: 3597: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 704 subscribers,2024-04-27 16:08:18.500227Z\r\n"]
+counter: 3598: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 704 subscribers,2024-04-27 16:13:18.501773Z\r\n"]
+counter: 3599: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 704 subscribers,2024-04-27 16:13:18.523581Z\r\n"]
+counter: 3600: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 704 subscribers,2024-04-27 16:18:18.525848Z\r\n"]
+counter: 3601: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 704 subscribers,2024-04-27 16:18:18.548360Z\r\n"]
+counter: 3602: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 705 subscribers,2024-04-27 16:23:18.553361Z\r\n"]
+counter: 3603: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 705 subscribers,2024-04-27 16:23:18.577453Z\r\n"]
+counter: 3604: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 705 subscribers,2024-04-27 16:28:18.629618Z\r\n"]
+counter: 3605: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 705 subscribers,2024-04-27 16:28:18.654728Z\r\n"]
+counter: 3606: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 705 subscribers,2024-04-27 16:33:18.657841Z\r\n"]
+counter: 3607: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 705 subscribers,2024-04-27 16:33:18.680104Z\r\n"]
+counter: 3608: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 705 subscribers,2024-04-27 16:38:18.682670Z\r\n"]
+counter: 3609: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 705 subscribers,2024-04-27 16:38:18.704822Z\r\n"]
+counter: 3610: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 706 subscribers,2024-04-27 16:43:18.711140Z\r\n"]
+counter: 3611: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 706 subscribers,2024-04-27 16:43:18.737949Z\r\n"]
+counter: 3612: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 706 subscribers,2024-04-27 16:48:18.734315Z\r\n"]
+counter: 3613: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 706 subscribers,2024-04-27 16:48:18.762864Z\r\n"]
+counter: 3614: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 706 subscribers,2024-04-27 16:53:18.760372Z\r\n"]
+counter: 3615: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 706 subscribers,2024-04-27 16:53:18.791034Z\r\n"]
+counter: 3616: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 705 subscribers,2024-04-27 16:58:18.785339Z\r\n"]
+counter: 3617: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 705 subscribers,2024-04-27 16:58:18.815917Z\r\n"]
+counter: 3618: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 706 subscribers,2024-04-27 17:03:18.810970Z\r\n"]
+counter: 3619: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 706 subscribers,2024-04-27 17:03:18.843507Z\r\n"]
+counter: 3620: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 706 subscribers,2024-04-27 17:08:18.835781Z\r\n"]
+counter: 3621: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 706 subscribers,2024-04-27 17:08:18.870716Z\r\n"]
+counter: 3622: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 709 subscribers,2024-04-27 17:13:18.859884Z\r\n"]
+counter: 3623: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 709 subscribers,2024-04-27 17:13:18.893850Z\r\n"]
+counter: 3624: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 709 subscribers,2024-04-27 17:18:18.887540Z\r\n"]
+counter: 3625: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 709 subscribers,2024-04-27 17:18:18.916801Z\r\n"]
+counter: 3626: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 17:23:18.910124Z\r\n"]
+counter: 3627: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 17:23:18.942626Z\r\n"]
+counter: 3628: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 17:28:18.935676Z\r\n"]
+counter: 3629: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 17:28:18.969516Z\r\n"]
+counter: 3630: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 17:33:18.961236Z\r\n"]
+counter: 3631: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 17:33:18.992628Z\r\n"]
+counter: 3632: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 17:38:18.985224Z\r\n"]
+counter: 3633: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 17:38:19.033493Z\r\n"]
+counter: 3634: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 17:43:19.019072Z\r\n"]
+counter: 3635: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 17:43:19.059467Z\r\n"]
+counter: 3636: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 17:48:19.043958Z\r\n"]
+counter: 3637: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 17:48:19.084377Z\r\n"]
+counter: 3638: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 17:53:19.072092Z\r\n"]
+counter: 3639: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 17:53:19.108413Z\r\n"]
+counter: 3640: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 17:58:19.098065Z\r\n"]
+counter: 3641: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 17:58:19.132914Z\r\n"]
+counter: 3642: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 18:03:19.125258Z\r\n"]
+counter: 3643: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 18:03:19.156490Z\r\n"]
+counter: 3644: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 18:08:19.153118Z\r\n"]
+counter: 3645: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 18:08:19.179494Z\r\n"]
+counter: 3646: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 18:13:19.178927Z\r\n"]
+counter: 3647: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 18:13:19.203289Z\r\n"]
+counter: 3648: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 707 subscribers,2024-04-27 18:18:19.206722Z\r\n"]
+counter: 3649: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 707 subscribers,2024-04-27 18:18:19.232144Z\r\n"]
+counter: 3650: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 707 subscribers,2024-04-27 18:23:19.232618Z\r\n"]
+counter: 3651: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 707 subscribers,2024-04-27 18:23:19.255202Z\r\n"]
+counter: 3652: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 707 subscribers,2024-04-27 18:28:19.257940Z\r\n"]
+counter: 3653: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 707 subscribers,2024-04-27 18:28:19.280974Z\r\n"]
+counter: 3654: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 18:33:19.284592Z\r\n"]
+counter: 3655: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 18:33:19.309301Z\r\n"]
+counter: 3656: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 18:38:19.308592Z\r\n"]
+counter: 3657: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 18:38:19.332903Z\r\n"]
+counter: 3658: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 18:43:19.333630Z\r\n"]
+counter: 3659: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 18:43:19.359055Z\r\n"]
+counter: 3660: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 18:48:19.362555Z\r\n"]
+counter: 3661: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 18:48:19.386407Z\r\n"]
+counter: 3662: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 18:53:19.388152Z\r\n"]
+counter: 3663: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 18:53:19.413480Z\r\n"]
+counter: 3664: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 18:58:19.414532Z\r\n"]
+counter: 3665: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 18:58:19.437565Z\r\n"]
+counter: 3666: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:03:19.438569Z\r\n"]
+counter: 3667: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:03:19.464065Z\r\n"]
+counter: 3668: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:08:19.462625Z\r\n"]
+counter: 3669: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:08:19.490234Z\r\n"]
+counter: 3670: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:13:19.487307Z\r\n"]
+counter: 3671: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:13:19.514084Z\r\n"]
+counter: 3672: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:18:19.512842Z\r\n"]
+counter: 3673: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:18:19.537599Z\r\n"]
+counter: 3674: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:23:19.539807Z\r\n"]
+counter: 3675: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:23:19.564648Z\r\n"]
+counter: 3676: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:28:19.565915Z\r\n"]
+counter: 3677: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:28:19.589557Z\r\n"]
+counter: 3678: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:33:19.594046Z\r\n"]
+counter: 3679: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:33:19.624771Z\r\n"]
+counter: 3680: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:38:19.621212Z\r\n"]
+counter: 3681: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:38:19.653595Z\r\n"]
+counter: 3682: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:43:19.646281Z\r\n"]
+counter: 3683: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:43:19.681224Z\r\n"]
+counter: 3684: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:48:19.678560Z\r\n"]
+counter: 3685: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:48:19.703835Z\r\n"]
+counter: 3686: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:53:19.709789Z\r\n"]
+counter: 3687: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:53:19.733215Z\r\n"]
+counter: 3688: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:58:19.740219Z\r\n"]
+counter: 3689: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 19:58:19.764631Z\r\n"]
+counter: 3690: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 20:03:19.763907Z\r\n"]
+counter: 3691: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 20:03:19.789274Z\r\n"]
+counter: 3692: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 20:08:19.792724Z\r\n"]
+counter: 3693: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 20:08:19.816239Z\r\n"]
+counter: 3694: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 20:13:19.818900Z\r\n"]
+counter: 3695: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 20:13:19.843113Z\r\n"]
+counter: 3696: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 20:18:19.865697Z\r\n"]
+counter: 3697: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 708 subscribers,2024-04-27 20:18:19.889332Z\r\n"]
+counter: 3698: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 709 subscribers,2024-04-27 20:23:19.891810Z\r\n"]
+counter: 3699: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 709 subscribers,2024-04-27 20:23:19.917196Z\r\n"]
+counter: 3700: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 709 subscribers,2024-04-27 20:28:19.921368Z\r\n"]
+counter: 3701: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 709 subscribers,2024-04-27 20:28:19.945279Z\r\n"]
+counter: 3702: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 709 subscribers,2024-04-27 20:33:19.947781Z\r\n"]
+counter: 3703: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 709 subscribers,2024-04-27 20:33:19.973312Z\r\n"]
+counter: 3704: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 709 subscribers,2024-04-27 20:38:20.038951Z\r\n"]
+counter: 3705: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 709 subscribers,2024-04-27 20:38:20.067279Z\r\n"]
+counter: 3706: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 710 subscribers,2024-04-27 20:43:20.064400Z\r\n"]
+counter: 3707: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 710 subscribers,2024-04-27 20:43:20.095252Z\r\n"]
+counter: 3708: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 710 subscribers,2024-04-27 20:48:20.093013Z\r\n"]
+counter: 3709: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 710 subscribers,2024-04-27 20:48:20.120739Z\r\n"]
+counter: 3710: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 710 subscribers,2024-04-27 20:53:20.119000Z\r\n"]
+counter: 3711: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 710 subscribers,2024-04-27 20:53:20.151605Z\r\n"]
+counter: 3712: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 710 subscribers,2024-04-27 20:58:20.150436Z\r\n"]
+counter: 3713: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 710 subscribers,2024-04-27 20:58:20.177023Z\r\n"]
+counter: 3714: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 710 subscribers,2024-04-27 21:03:20.174192Z\r\n"]
+counter: 3715: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 710 subscribers,2024-04-27 21:03:20.212478Z\r\n"]
+counter: 3716: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 710 subscribers,2024-04-27 21:08:20.203949Z\r\n"]
+counter: 3717: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 710 subscribers,2024-04-27 21:08:20.238071Z\r\n"]
+counter: 3718: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:13:20.229765Z\r\n"]
+counter: 3719: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:13:20.264977Z\r\n"]
+counter: 3720: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:18:20.256382Z\r\n"]
+counter: 3721: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:18:20.290846Z\r\n"]
+counter: 3722: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:23:20.287610Z\r\n"]
+counter: 3723: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:23:20.314275Z\r\n"]
+counter: 3724: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:28:20.318027Z\r\n"]
+counter: 3725: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:28:20.344805Z\r\n"]
+counter: 3726: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:33:20.345224Z\r\n"]
+counter: 3727: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:33:20.368405Z\r\n"]
+counter: 3728: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:38:20.371886Z\r\n"]
+counter: 3729: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:38:20.396866Z\r\n"]
+counter: 3730: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:43:20.403230Z\r\n"]
+counter: 3731: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:43:20.429669Z\r\n"]
+counter: 3732: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:48:20.436919Z\r\n"]
+counter: 3733: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:48:20.461844Z\r\n"]
+counter: 3734: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:53:20.519972Z\r\n"]
+counter: 3735: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:53:20.544847Z\r\n"]
+counter: 3736: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:58:20.543975Z\r\n"]
+counter: 3737: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 21:58:20.573736Z\r\n"]
+counter: 3738: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:03:20.568903Z\r\n"]
+counter: 3739: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:03:20.597939Z\r\n"]
+counter: 3740: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:08:20.595262Z\r\n"]
+counter: 3741: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:08:20.629252Z\r\n"]
+counter: 3742: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:13:20.631680Z\r\n"]
+counter: 3743: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:13:20.656447Z\r\n"]
+counter: 3744: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:18:20.663391Z\r\n"]
+counter: 3745: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:18:20.692320Z\r\n"]
+counter: 3746: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:23:20.694873Z\r\n"]
+counter: 3747: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:23:20.723977Z\r\n"]
+counter: 3748: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:28:20.722406Z\r\n"]
+counter: 3749: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:28:20.751763Z\r\n"]
+counter: 3750: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:33:20.747924Z\r\n"]
+counter: 3751: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:33:20.780781Z\r\n"]
+counter: 3752: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:38:20.777688Z\r\n"]
+counter: 3753: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:38:20.807375Z\r\n"]
+counter: 3754: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:43:20.802655Z\r\n"]
+counter: 3755: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:43:20.831160Z\r\n"]
+counter: 3756: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:48:20.831273Z\r\n"]
+counter: 3757: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:48:20.857631Z\r\n"]
+counter: 3758: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:53:20.864436Z\r\n"]
+counter: 3759: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:53:20.892391Z\r\n"]
+counter: 3760: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:58:20.914916Z\r\n"]
+counter: 3761: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 22:58:20.944907Z\r\n"]
+counter: 3762: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 23:03:20.941343Z\r\n"]
+counter: 3763: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 23:03:20.995536Z\r\n"]
+counter: 3764: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 23:08:20.965385Z\r\n"]
+counter: 3765: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 23:08:21.036242Z\r\n"]
+counter: 3766: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 23:13:20.994464Z\r\n"]
+counter: 3767: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 23:13:21.059839Z\r\n"]
+counter: 3768: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 23:18:21.029011Z\r\n"]
+counter: 3769: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 711 subscribers,2024-04-27 23:18:21.085103Z\r\n"]
+counter: 3770: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 712 subscribers,2024-04-27 23:23:21.052583Z\r\n"]
+counter: 3771: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 712 subscribers,2024-04-27 23:23:21.112115Z\r\n"]
+counter: 3772: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 712 subscribers,2024-04-27 23:28:21.080654Z\r\n"]
+counter: 3773: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 712 subscribers,2024-04-27 23:28:21.135713Z\r\n"]
+counter: 3774: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 712 subscribers,2024-04-27 23:33:21.109546Z\r\n"]
+counter: 3775: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 712 subscribers,2024-04-27 23:33:21.160965Z\r\n"]
+counter: 3776: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 712 subscribers,2024-04-27 23:38:21.139924Z\r\n"]
+counter: 3777: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 712 subscribers,2024-04-27 23:38:21.184440Z\r\n"]
+counter: 3778: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 712 subscribers,2024-04-27 23:43:21.175843Z\r\n"]
+counter: 3779: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 712 subscribers,2024-04-27 23:43:21.208274Z\r\n"]
+counter: 3780: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-27 23:48:21.201428Z\r\n"]
+counter: 3781: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-27 23:48:21.231686Z\r\n"]
+counter: 3782: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-27 23:53:21.227696Z\r\n"]
+counter: 3783: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-27 23:53:21.267677Z\r\n"]
+counter: 3784: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-27 23:58:21.253068Z\r\n"]
+counter: 3785: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-27 23:58:21.292524Z\r\n"]
+counter: 3786: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:03:21.276958Z\r\n"]
+counter: 3787: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:03:21.318203Z\r\n"]
+counter: 3788: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:08:21.301270Z\r\n"]
+counter: 3789: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:08:21.341761Z\r\n"]
+counter: 3790: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:13:21.331567Z\r\n"]
+counter: 3791: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:13:21.365686Z\r\n"]
+counter: 3792: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:18:21.357355Z\r\n"]
+counter: 3793: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:18:21.395187Z\r\n"]
+counter: 3794: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:23:21.379481Z\r\n"]
+counter: 3795: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:23:21.419125Z\r\n"]
+counter: 3796: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:28:21.408952Z\r\n"]
+counter: 3797: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:28:21.443060Z\r\n"]
+counter: 3798: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:33:21.432476Z\r\n"]
+counter: 3799: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:33:21.469363Z\r\n"]
+counter: 3800: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:38:21.456761Z\r\n"]
+counter: 3801: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:38:21.496389Z\r\n"]
+counter: 3802: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:43:21.487103Z\r\n"]
+counter: 3803: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:43:21.518989Z\r\n"]
+counter: 3804: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:48:21.575109Z\r\n"]
+counter: 3805: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:48:21.599881Z\r\n"]
+counter: 3806: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:53:21.602719Z\r\n"]
+counter: 3807: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:53:21.629667Z\r\n"]
+counter: 3808: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:58:21.626565Z\r\n"]
+counter: 3809: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 00:58:21.658200Z\r\n"]
+counter: 3810: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 01:03:21.669260Z\r\n"]
+counter: 3811: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 01:03:21.701408Z\r\n"]
+counter: 3812: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 01:08:21.698026Z\r\n"]
+counter: 3813: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 01:08:21.729489Z\r\n"]
+counter: 3814: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 01:13:21.725823Z\r\n"]
+counter: 3815: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 01:13:21.756186Z\r\n"]
+counter: 3816: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 01:18:21.753350Z\r\n"]
+counter: 3817: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 01:18:21.786041Z\r\n"]
+counter: 3818: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 01:23:21.793558Z\r\n"]
+counter: 3819: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 01:23:21.828503Z\r\n"]
+counter: 3820: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 01:28:21.819992Z\r\n"]
+counter: 3821: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 01:28:21.859752Z\r\n"]
+counter: 3822: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 01:33:21.850116Z\r\n"]
+counter: 3823: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 713 subscribers,2024-04-28 01:33:21.886159Z\r\n"]
+counter: 3824: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 714 subscribers,2024-04-28 01:38:21.886275Z\r\n"]
+counter: 3825: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 714 subscribers,2024-04-28 01:38:21.916030Z\r\n"]
+counter: 3826: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 714 subscribers,2024-04-28 01:43:21.910507Z\r\n"]
+counter: 3827: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 714 subscribers,2024-04-28 01:43:21.941229Z\r\n"]
+counter: 3828: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 714 subscribers,2024-04-28 01:48:21.938742Z\r\n"]
+counter: 3829: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 714 subscribers,2024-04-28 01:48:21.969243Z\r\n"]
+counter: 3830: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 715 subscribers,2024-04-28 01:53:21.967558Z\r\n"]
+counter: 3831: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 715 subscribers,2024-04-28 01:53:21.994597Z\r\n"]
+counter: 3832: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 715 subscribers,2024-04-28 01:58:21.998698Z\r\n"]
+counter: 3833: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 715 subscribers,2024-04-28 01:58:22.024893Z\r\n"]
+counter: 3834: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 715 subscribers,2024-04-28 02:03:22.028848Z\r\n"]
+counter: 3835: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 715 subscribers,2024-04-28 02:03:22.054335Z\r\n"]
+counter: 3836: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 715 subscribers,2024-04-28 02:08:22.056432Z\r\n"]
+counter: 3837: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 715 subscribers,2024-04-28 02:08:22.082504Z\r\n"]
+counter: 3838: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 715 subscribers,2024-04-28 02:13:22.101231Z\r\n"]
+counter: 3839: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 715 subscribers,2024-04-28 02:13:22.129490Z\r\n"]
+counter: 3840: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 715 subscribers,2024-04-28 02:18:22.130258Z\r\n"]
+counter: 3841: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 715 subscribers,2024-04-28 02:18:22.165369Z\r\n"]
+counter: 3842: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 716 subscribers,2024-04-28 02:23:22.157119Z\r\n"]
+counter: 3843: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 716 subscribers,2024-04-28 02:23:22.193011Z\r\n"]
+counter: 3844: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 716 subscribers,2024-04-28 02:28:22.184086Z\r\n"]
+counter: 3845: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 716 subscribers,2024-04-28 02:28:22.216870Z\r\n"]
+counter: 3846: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 716 subscribers,2024-04-28 02:33:22.216891Z\r\n"]
+counter: 3847: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 716 subscribers,2024-04-28 02:33:22.241145Z\r\n"]
+counter: 3848: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 717 subscribers,2024-04-28 02:38:22.244044Z\r\n"]
+counter: 3849: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 717 subscribers,2024-04-28 02:38:22.269455Z\r\n"]
+counter: 3850: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 717 subscribers,2024-04-28 02:43:22.276176Z\r\n"]
+counter: 3851: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 717 subscribers,2024-04-28 02:43:22.303752Z\r\n"]
+counter: 3852: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 717 subscribers,2024-04-28 02:48:22.303556Z\r\n"]
+counter: 3853: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 717 subscribers,2024-04-28 02:48:22.328770Z\r\n"]
+counter: 3854: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 718 subscribers,2024-04-28 02:53:22.327326Z\r\n"]
+counter: 3855: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 718 subscribers,2024-04-28 02:53:22.356322Z\r\n"]
+counter: 3856: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 718 subscribers,2024-04-28 02:58:22.353331Z\r\n"]
+counter: 3857: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 718 subscribers,2024-04-28 02:58:22.380290Z\r\n"]
+counter: 3858: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 718 subscribers,2024-04-28 03:03:22.378704Z\r\n"]
+counter: 3859: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 718 subscribers,2024-04-28 03:03:22.409017Z\r\n"]
+counter: 3860: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 718 subscribers,2024-04-28 03:08:22.412447Z\r\n"]
+counter: 3861: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 718 subscribers,2024-04-28 03:08:22.443161Z\r\n"]
+counter: 3862: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 718 subscribers,2024-04-28 03:13:22.440140Z\r\n"]
+counter: 3863: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 718 subscribers,2024-04-28 03:13:22.470829Z\r\n"]
+counter: 3864: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 718 subscribers,2024-04-28 03:18:22.468324Z\r\n"]
+counter: 3865: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 718 subscribers,2024-04-28 03:18:22.498511Z\r\n"]
+counter: 3866: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 718 subscribers,2024-04-28 03:23:22.498932Z\r\n"]
+counter: 3867: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 718 subscribers,2024-04-28 03:23:22.524503Z\r\n"]
+counter: 3868: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 719 subscribers,2024-04-28 03:28:22.526642Z\r\n"]
+counter: 3869: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 719 subscribers,2024-04-28 03:28:22.550963Z\r\n"]
+counter: 3870: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 719 subscribers,2024-04-28 03:33:22.556441Z\r\n"]
+counter: 3871: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 719 subscribers,2024-04-28 03:33:22.588354Z\r\n"]
+counter: 3872: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 719 subscribers,2024-04-28 03:38:22.580413Z\r\n"]
+counter: 3873: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 719 subscribers,2024-04-28 03:38:22.617017Z\r\n"]
+counter: 3874: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 720 subscribers,2024-04-28 03:43:22.606105Z\r\n"]
+counter: 3875: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 720 subscribers,2024-04-28 03:43:22.644916Z\r\n"]
+counter: 3876: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 720 subscribers,2024-04-28 03:48:22.638489Z\r\n"]
+counter: 3877: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 720 subscribers,2024-04-28 03:48:22.677776Z\r\n"]
+counter: 3878: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 720 subscribers,2024-04-28 03:53:22.665018Z\r\n"]
+counter: 3879: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 720 subscribers,2024-04-28 03:53:22.702981Z\r\n"]
+counter: 3880: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 722 subscribers,2024-04-28 03:58:22.693181Z\r\n"]
+counter: 3881: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 722 subscribers,2024-04-28 03:58:22.730331Z\r\n"]
+counter: 3882: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 722 subscribers,2024-04-28 04:03:22.717477Z\r\n"]
+counter: 3883: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 722 subscribers,2024-04-28 04:03:22.753732Z\r\n"]
+counter: 3884: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 722 subscribers,2024-04-28 04:08:22.771379Z\r\n"]
+counter: 3885: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 722 subscribers,2024-04-28 04:08:22.796001Z\r\n"]
+counter: 3886: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 722 subscribers,2024-04-28 04:13:22.795872Z\r\n"]
+counter: 3887: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 722 subscribers,2024-04-28 04:13:22.819899Z\r\n"]
+counter: 3888: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 722 subscribers,2024-04-28 04:18:22.820721Z\r\n"]
+counter: 3889: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 722 subscribers,2024-04-28 04:18:22.847757Z\r\n"]
+counter: 3890: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 722 subscribers,2024-04-28 04:23:22.846721Z\r\n"]
+counter: 3891: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 722 subscribers,2024-04-28 04:23:22.877073Z\r\n"]
+counter: 3892: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 725 subscribers,2024-04-28 04:28:22.879706Z\r\n"]
+counter: 3893: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 725 subscribers,2024-04-28 04:28:22.911010Z\r\n"]
+counter: 3894: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 725 subscribers,2024-04-28 04:33:22.909040Z\r\n"]
+counter: 3895: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 725 subscribers,2024-04-28 04:33:22.935232Z\r\n"]
+counter: 3896: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 725 subscribers,2024-04-28 04:38:22.937448Z\r\n"]
+counter: 3897: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 725 subscribers,2024-04-28 04:38:22.963211Z\r\n"]
+counter: 3898: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 725 subscribers,2024-04-28 04:43:22.965179Z\r\n"]
+counter: 3899: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 725 subscribers,2024-04-28 04:43:22.989330Z\r\n"]
+counter: 3900: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 725 subscribers,2024-04-28 04:48:22.994689Z\r\n"]
+counter: 3901: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 725 subscribers,2024-04-28 04:48:23.037444Z\r\n"]
+counter: 3902: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 725 subscribers,2024-04-28 04:53:23.023243Z\r\n"]
+counter: 3903: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 725 subscribers,2024-04-28 04:53:23.064896Z\r\n"]
+counter: 3904: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 725 subscribers,2024-04-28 04:58:23.106609Z\r\n"]
+counter: 3905: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 725 subscribers,2024-04-28 04:58:23.134341Z\r\n"]
+counter: 3906: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 727 subscribers,2024-04-28 05:03:23.143877Z\r\n"]
+counter: 3907: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 727 subscribers,2024-04-28 05:03:23.183532Z\r\n"]
+counter: 3908: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 727 subscribers,2024-04-28 05:08:23.171839Z\r\n"]
+counter: 3909: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 727 subscribers,2024-04-28 05:08:23.214551Z\r\n"]
+counter: 3910: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 727 subscribers,2024-04-28 05:13:23.199650Z\r\n"]
+counter: 3911: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 727 subscribers,2024-04-28 05:13:23.242494Z\r\n"]
+counter: 3912: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 730 subscribers,2024-04-28 05:18:23.223981Z\r\n"]
+counter: 3913: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 730 subscribers,2024-04-28 05:18:23.271264Z\r\n"]
+counter: 3914: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 730 subscribers,2024-04-28 05:23:23.252151Z\r\n"]
+counter: 3915: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 730 subscribers,2024-04-28 05:23:23.303752Z\r\n"]
+counter: 3916: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 730 subscribers,2024-04-28 05:28:23.281576Z\r\n"]
+counter: 3917: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 730 subscribers,2024-04-28 05:28:23.389132Z\r\n"]
+counter: 3918: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 731 subscribers,2024-04-28 05:33:23.305646Z\r\n"]
+counter: 3919: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 731 subscribers,2024-04-28 05:33:23.417107Z\r\n"]
+counter: 3920: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 732 subscribers,2024-04-28 05:38:23.332100Z\r\n"]
+counter: 3921: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 732 subscribers,2024-04-28 05:38:23.448224Z\r\n"]
+counter: 3922: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 732 subscribers,2024-04-28 05:43:23.358954Z\r\n"]
+counter: 3923: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 732 subscribers,2024-04-28 05:43:23.471191Z\r\n"]
+counter: 3924: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 05:48:23.386046Z\r\n"]
+counter: 3925: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 05:48:23.495756Z\r\n"]
+counter: 3926: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 05:53:23.412591Z\r\n"]
+counter: 3927: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 05:53:23.520241Z\r\n"]
+counter: 3928: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 05:58:23.444179Z\r\n"]
+counter: 3929: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 05:58:23.549920Z\r\n"]
+counter: 3930: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 06:03:23.474180Z\r\n"]
+counter: 3931: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 06:03:23.582645Z\r\n"]
+counter: 3932: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 06:08:23.498013Z\r\n"]
+counter: 3933: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 06:08:23.609627Z\r\n"]
+counter: 3934: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 06:13:23.532390Z\r\n"]
+counter: 3935: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 06:13:23.634298Z\r\n"]
+counter: 3936: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 06:18:23.561851Z\r\n"]
+counter: 3937: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 06:18:23.668267Z\r\n"]
+counter: 3938: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 06:23:23.599669Z\r\n"]
+counter: 3939: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 06:23:23.693387Z\r\n"]
+counter: 3940: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 06:28:23.633132Z\r\n"]
+counter: 3941: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 06:28:23.718741Z\r\n"]
+counter: 3942: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 06:33:23.667799Z\r\n"]
+counter: 3943: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 06:33:23.756031Z\r\n"]
+counter: 3944: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 734 subscribers,2024-04-28 06:38:23.692627Z\r\n"]
+counter: 3945: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 734 subscribers,2024-04-28 06:38:23.783598Z\r\n"]
+counter: 3946: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 734 subscribers,2024-04-28 06:43:23.718835Z\r\n"]
+counter: 3947: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 734 subscribers,2024-04-28 06:43:23.811717Z\r\n"]
+counter: 3948: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 734 subscribers,2024-04-28 06:48:23.752108Z\r\n"]
+counter: 3949: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 734 subscribers,2024-04-28 06:48:23.843531Z\r\n"]
+counter: 3950: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 734 subscribers,2024-04-28 06:53:23.783499Z\r\n"]
+counter: 3951: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 734 subscribers,2024-04-28 06:53:23.869870Z\r\n"]
+counter: 3952: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 735 subscribers,2024-04-28 06:58:23.820402Z\r\n"]
+counter: 3953: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 735 subscribers,2024-04-28 06:58:23.900368Z\r\n"]
+counter: 3954: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 735 subscribers,2024-04-28 07:03:23.847140Z\r\n"]
+counter: 3955: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 735 subscribers,2024-04-28 07:03:23.927558Z\r\n"]
+counter: 3956: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 735 subscribers,2024-04-28 07:08:23.876900Z\r\n"]
+counter: 3957: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 735 subscribers,2024-04-28 07:08:23.953460Z\r\n"]
+counter: 3958: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 735 subscribers,2024-04-28 07:13:23.903534Z\r\n"]
+counter: 3959: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 735 subscribers,2024-04-28 07:13:23.991239Z\r\n"]
+counter: 3960: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 734 subscribers,2024-04-28 07:18:23.973643Z\r\n"]
+counter: 3961: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 734 subscribers,2024-04-28 07:18:24.026606Z\r\n"]
+counter: 3962: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 734 subscribers,2024-04-28 07:23:24.012988Z\r\n"]
+counter: 3963: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 734 subscribers,2024-04-28 07:23:24.051088Z\r\n"]
+counter: 3964: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 734 subscribers,2024-04-28 07:28:24.046204Z\r\n"]
+counter: 3965: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 734 subscribers,2024-04-28 07:28:24.083302Z\r\n"]
+counter: 3966: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 07:33:24.076297Z\r\n"]
+counter: 3967: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 07:33:24.122872Z\r\n"]
+counter: 3968: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 07:38:24.107311Z\r\n"]
+counter: 3969: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 07:38:24.152175Z\r\n"]
+counter: 3970: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 07:43:24.139132Z\r\n"]
+counter: 3971: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 07:43:24.182262Z\r\n"]
+counter: 3972: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 07:48:24.164698Z\r\n"]
+counter: 3973: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 07:48:24.212082Z\r\n"]
+counter: 3974: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 07:53:24.199907Z\r\n"]
+counter: 3975: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 07:53:24.242253Z\r\n"]
+counter: 3976: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 07:58:24.225332Z\r\n"]
+counter: 3977: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 07:58:24.272473Z\r\n"]
+counter: 3978: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 08:03:24.256376Z\r\n"]
+counter: 3979: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 08:03:24.303988Z\r\n"]
+counter: 3980: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 08:08:24.282458Z\r\n"]
+counter: 3981: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 08:08:24.332069Z\r\n"]
+counter: 3982: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 08:13:24.323936Z\r\n"]
+counter: 3983: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 08:13:24.358070Z\r\n"]
+counter: 3984: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 734 subscribers,2024-04-28 08:18:24.350534Z\r\n"]
+counter: 3985: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 734 subscribers,2024-04-28 08:18:24.383771Z\r\n"]
+counter: 3986: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 734 subscribers,2024-04-28 08:23:24.386382Z\r\n"]
+counter: 3987: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 734 subscribers,2024-04-28 08:23:24.414560Z\r\n"]
+counter: 3988: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 08:28:24.419103Z\r\n"]
+counter: 3989: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 08:28:24.452580Z\r\n"]
+counter: 3990: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 08:33:24.445267Z\r\n"]
+counter: 3991: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 08:33:24.481185Z\r\n"]
+counter: 3992: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 08:38:24.487925Z\r\n"]
+counter: 3993: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 733 subscribers,2024-04-28 08:38:24.524741Z\r\n"]
+counter: 3994: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 736 subscribers,2024-04-28 08:43:24.523795Z\r\n"]
+counter: 3995: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 736 subscribers,2024-04-28 08:43:24.549649Z\r\n"]
+counter: 3996: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 736 subscribers,2024-04-28 08:48:24.554257Z\r\n"]
+counter: 3997: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 736 subscribers,2024-04-28 08:48:24.579555Z\r\n"]
+counter: 3998: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 736 subscribers,2024-04-28 08:53:24.583923Z\r\n"]
+counter: 3999: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 736 subscribers,2024-04-28 08:53:24.613383Z\r\n"]
+counter: 4000: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 736 subscribers,2024-04-28 08:58:24.615420Z\r\n"]
+counter: 4001: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 736 subscribers,2024-04-28 08:58:24.651121Z\r\n"]
+counter: 4002: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 737 subscribers,2024-04-28 09:03:24.646082Z\r\n"]
+counter: 4003: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 737 subscribers,2024-04-28 09:03:24.676974Z\r\n"]
+counter: 4004: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 737 subscribers,2024-04-28 09:08:24.727204Z\r\n"]
+counter: 4005: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 737 subscribers,2024-04-28 09:08:24.755894Z\r\n"]
+counter: 4006: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 738 subscribers,2024-04-28 09:13:24.753272Z\r\n"]
+counter: 4007: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 738 subscribers,2024-04-28 09:13:24.785329Z\r\n"]
+counter: 4008: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 738 subscribers,2024-04-28 09:18:24.784323Z\r\n"]
+counter: 4009: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 738 subscribers,2024-04-28 09:18:24.826541Z\r\n"]
+counter: 4010: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 738 subscribers,2024-04-28 09:23:24.810402Z\r\n"]
+counter: 4011: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 738 subscribers,2024-04-28 09:23:24.852898Z\r\n"]
+counter: 4012: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 738 subscribers,2024-04-28 09:28:24.837184Z\r\n"]
+counter: 4013: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 738 subscribers,2024-04-28 09:28:24.878121Z\r\n"]
+counter: 4014: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 739 subscribers,2024-04-28 09:33:24.865096Z\r\n"]
+counter: 4015: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 739 subscribers,2024-04-28 09:33:24.901994Z\r\n"]
+counter: 4016: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 739 subscribers,2024-04-28 09:38:24.894090Z\r\n"]
+counter: 4017: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 739 subscribers,2024-04-28 09:38:24.929552Z\r\n"]
+counter: 4018: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 740 subscribers,2024-04-28 09:43:24.923532Z\r\n"]
+counter: 4019: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 740 subscribers,2024-04-28 09:43:24.957898Z\r\n"]
+counter: 4020: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 740 subscribers,2024-04-28 09:48:24.959952Z\r\n"]
+counter: 4021: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 740 subscribers,2024-04-28 09:48:24.984174Z\r\n"]
+counter: 4022: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 740 subscribers,2024-04-28 09:53:24.987317Z\r\n"]
+counter: 4023: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 740 subscribers,2024-04-28 09:53:25.027749Z\r\n"]
+counter: 4024: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 740 subscribers,2024-04-28 09:58:25.031721Z\r\n"]
+counter: 4025: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 740 subscribers,2024-04-28 09:58:25.061094Z\r\n"]
+counter: 4026: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 741 subscribers,2024-04-28 10:03:25.062534Z\r\n"]
+counter: 4027: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 741 subscribers,2024-04-28 10:03:25.090195Z\r\n"]
+counter: 4028: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 741 subscribers,2024-04-28 10:08:25.090406Z\r\n"]
+counter: 4029: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 741 subscribers,2024-04-28 10:08:25.121867Z\r\n"]
+counter: 4030: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 741 subscribers,2024-04-28 10:13:25.129179Z\r\n"]
+counter: 4031: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 741 subscribers,2024-04-28 10:13:25.153680Z\r\n"]
+counter: 4032: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 742 subscribers,2024-04-28 10:18:25.165976Z\r\n"]
+counter: 4033: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 742 subscribers,2024-04-28 10:18:25.192201Z\r\n"]
+counter: 4034: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 742 subscribers,2024-04-28 10:23:25.193983Z\r\n"]
+counter: 4035: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 742 subscribers,2024-04-28 10:23:25.220587Z\r\n"]
+counter: 4036: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 742 subscribers,2024-04-28 10:28:25.224081Z\r\n"]
+counter: 4037: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 742 subscribers,2024-04-28 10:28:25.255600Z\r\n"]
+counter: 4038: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 741 subscribers,2024-04-28 10:33:25.255729Z\r\n"]
+counter: 4039: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 741 subscribers,2024-04-28 10:33:25.283221Z\r\n"]
+counter: 4040: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 741 subscribers,2024-04-28 10:38:25.282619Z\r\n"]
+counter: 4041: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 741 subscribers,2024-04-28 10:38:25.309058Z\r\n"]
+counter: 4042: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 741 subscribers,2024-04-28 10:43:25.312484Z\r\n"]
+counter: 4043: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 741 subscribers,2024-04-28 10:43:25.340805Z\r\n"]
+counter: 4044: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 741 subscribers,2024-04-28 10:48:25.339392Z\r\n"]
+counter: 4045: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 741 subscribers,2024-04-28 10:48:25.368833Z\r\n"]
+counter: 4046: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 739 subscribers,2024-04-28 10:53:25.367940Z\r\n"]
+counter: 4047: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 739 subscribers,2024-04-28 10:53:25.397874Z\r\n"]
+counter: 4048: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 739 subscribers,2024-04-28 10:58:25.395071Z\r\n"]
+counter: 4049: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 739 subscribers,2024-04-28 10:58:25.424542Z\r\n"]
+counter: 4050: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 739 subscribers,2024-04-28 11:03:25.423514Z\r\n"]
+counter: 4051: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 739 subscribers,2024-04-28 11:03:25.453601Z\r\n"]
+counter: 4052: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 739 subscribers,2024-04-28 11:08:25.449737Z\r\n"]
+counter: 4053: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+content: ["24 739 subscribers,2024-04-28 11:08:25.484507Z\r\n"]
+counter: 4054: {"pmfias_channel.csv", "https://t.me/pmfias_channel"}
+
+11:13:40.453 [error] retry: got exception, will retry in 1000ms, 3 attempts left
+
+11:13:40.453 [error] ** (Mint.TransportError) timeout
+
+11:13:56.507 [error] retry: got exception, will retry in 2000ms, 2 attempts left
+
+11:13:56.507 [error] ** (Mint.TransportError) timeout
+
+11:14:03.510 [error] retry: got exception, will retry in 4000ms, 1 attempt left
+
+11:14:03.510 [error] ** (Mint.TransportError) timeout
+
+```

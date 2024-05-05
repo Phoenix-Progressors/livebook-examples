@@ -1,0 +1,1368 @@
+<!-- livebook:{"app_settings":{"auto_shutdown_ms":3600000,"output_type":"rich","slug":"pmf-analytics","zero_downtime":true},"file_entries":[{"name":"2024-03-04_13_07_24.db","type":"attachment"},{"file":{"file_system_id":"local","file_system_type":"local","path":"/data/2024-03-06_02_06_35.db"},"name":"2024-03-06_02_06_35.db","type":"file"},{"file":{"file_system_id":"local","file_system_type":"local","path":"/data/2024-03-06_04_57_41.db"},"name":"2024-03-06_04_57_41.db","type":"file"},{"file":{"file_system_id":"local","file_system_type":"local","path":"/data/2024-03-06_15_32_45.db"},"name":"2024-03-06_15_32_45.db","type":"file"},{"file":{"file_system_id":"local","file_system_type":"local","path":"/data/2024-03-07_16_28_58.db"},"name":"2024-03-07_16_28_58.db","type":"file"},{"name":"2024-0304_08-17-15_pyq_ratta_dev.sql","type":"attachment"},{"name":"my.db","type":"attachment"}],"persist_outputs":true} -->
+
+# livebook sql file
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.12.0"},
+  {:kino_db, "~> 0.2.3"},
+  {:exqlite, "~> 0.11.0"}
+])
+```
+
+## Section
+
+```elixir
+defmodule LatestFile do
+  @moduledoc """
+  # Usage
+  {:ok, latest_file} = LatestFile.latest_db_file("/data/")
+  """
+  def latest_db_file(path) do
+    File.ls!(path)
+    |> Enum.filter(&String.ends_with?(&1, ".db"))
+    |> Enum.map(&{&1, File.stat!("#{path}/#{&1}")})
+    |> Enum.sort_by(&elem(&1, 1).mtime, :desc)
+    |> List.first()
+    |> case do
+      nil -> {:error, "No .db files found"}
+      {file, _stat} -> {:ok, file}
+    end
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, LatestFile, <<70, 79, 82, 49, 0, 0, 11, ...>>, {:latest_db_file, 1}}
+```
+
+```elixir
+
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+nil
+```
+
+```elixir
+defmodule MonitoringTools.RenderAfter do
+  use GenServer
+
+  require Logger
+
+  @interval 1000 * 60
+  # @interval 1000
+
+  # +--------------------+
+  # |     Public API     |
+  # +--------------------+
+
+  def start_link(opts) do
+    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  end
+
+  # +---------------------+
+  # |      Callbacks      |
+  # +---------------------+
+
+  @impl true
+  def init(_opts) do
+    # Similarly to our cron job GenSever from Chapter 4, we lean on
+    # the `handle_continue/2` callback to schedule our next
+    # cron job execution.
+    state = %{database_path: nil, conn: nil}
+
+    {:ok, state, {:continue, :schedule_next_run}}
+  end
+
+  def get_state() do
+    GenServer.call(__MODULE__, :get_state)
+  end
+
+  @impl true
+  def handle_continue(:schedule_next_run, state) do
+    Process.send_after(self(), :log_top_n, @interval)
+    {:noreply, update_state(state)}
+  end
+
+  def handle_call(:get_state, from, state) do
+    {:reply, state, state}
+  end
+
+  @impl true
+  def handle_info(:log_top_n, state) do
+    {:noreply, update_state(state), {:continue, :schedule_next_run}}
+  end
+
+  def update_state(state) do
+    {:ok, database_path} = LatestFile.latest_db_file("/data/")
+
+    (state.conn && Kino.terminate_child(state.conn))
+    |> IO.inspect(label: "old kino process deleted.")
+
+    {:ok, conn} = Kino.start_child({Exqlite, database: database_path})
+
+    %{state | database_path: database_path, conn: conn}
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+warning: variable "from" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  localsqlfile.livemd#cell:5et3cwwyixo6hkdt:41: MonitoringTools.RenderAfter.handle_call/3
+
+warning: module attribute @impl was not set for function handle_call/3 callback (specified in GenServer). This either means you forgot to add the "@impl true" annotation before the definition or that you are accidentally overriding this callback
+  localsqlfile.livemd#cell:5et3cwwyixo6hkdt:41: MonitoringTools.RenderAfter (module)
+
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, MonitoringTools.RenderAfter, <<70, 79, 82, 49, 0, 0, 23, ...>>, {:update_state, 1}}
+```
+
+```elixir
+if is_pid(Process.whereis(MonitoringTools.RenderAfter)) do
+  GenServer.stop(MonitoringTools.RenderAfter)
+end
+
+{:ok, monitor_pid} = MonitoringTools.RenderAfter.start_link(:ok)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok, #PID<0.1332.0>}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+old kino process deleted.: nil
+```
+
+```elixir
+# Kino.Markdown.new("""
+# ### #students in all quiz
+# """)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+nil
+```
+
+```elixir
+# query = "SELECT 
+#     SUBSTR(q.id, 0, 8) as quiz_id, 
+#     # COUNT(DISTINCT uqr.user_id) AS number_of_students,
+#     COUNT(DISTINCT qq.question_id) AS number_of_questions,
+#     q.created_at as created_at
+# FROM quiz q
+# LEFT JOIN user_quiz_response uqr ON q.id = uqr.quiz_id
+# LEFT JOIN quiz_questions qq ON q.id = qq.quiz_id
+# GROUP BY q.id
+# ORDER BY q.id"
+
+# Exqlite.query!(conn, query, [])
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+nil
+```
+
+```elixir
+Kino.Markdown.new("""
+### #percent of students who got a question right
+
+List of questions followed by `percentage_correct`
+
+Please use `show` button on the able to show all entries
+""")
+```
+
+```elixir
+# query = """
+# SELECT 
+#     SUBSTR(qq.quiz_id, 0, 8) as quiz_id ,
+#     SUBSTR(q.short_description, 0, 9) as quiz_day,
+#     qq.question_number,
+#     ROUND(
+#       (SUM(CASE WHEN LOWER(q.correct_answer_text) = LOWER(uqr.attempted_answer) THEN 1 ELSE 0 END) * 100.0) / COUNT(uqr.user_id),
+#       1 ) AS percentage_correct,
+#     COUNT(DISTINCT uqr.user_id) AS students_attempted
+# FROM quiz_questions qq
+# JOIN question q ON qq.question_id = q.id
+# LEFT JOIN user_quiz_response uqr ON qq.question_id = uqr.question_id AND qq.quiz_id = uqr.quiz_id
+# WHERE qq.quiz_id != '6d3d5600-6c11-46c0-acc5-2d3cc422313a'
+# GROUP BY qq.quiz_id, qq.question_id
+# ORDER BY q.created_at, qq.question_number
+
+# """
+
+# Exqlite.query!(conn, query, [])
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+nil
+```
+
+```elixir
+button = Kino.Control.button("Latest Results")
+```
+
+```elixir
+frame = Kino.Frame.new()
+```
+
+```elixir
+Kino.listen(button, fn _event ->
+  Kino.Frame.clear(frame)
+  %{conn: conn, database_path: _database_path} = MonitoringTools.RenderAfter.get_state()
+
+  query = """
+    SELECT 
+        SUBSTR(qq.quiz_id, 0, 8) as quiz_id ,
+        SUBSTR(q.short_description, 0, 9) as quiz_day,
+        qq.question_number,
+        ROUND(
+          (SUM(CASE WHEN LOWER(q.correct_answer_text) = LOWER(uqr.attempted_answer) THEN 1 ELSE 0 END) * 100.0) / COUNT(uqr.user_id),
+          1 ) AS percentage_correct,
+        COUNT(DISTINCT uqr.user_id) AS students_attempted
+    FROM quiz_questions qq
+    JOIN question q ON qq.question_id = q.id
+    LEFT JOIN user_quiz_response uqr ON qq.question_id = uqr.question_id AND qq.quiz_id = uqr.quiz_id
+    WHERE qq.quiz_id != '6d3d5600-6c11-46c0-acc5-2d3cc422313a'
+    GROUP BY qq.quiz_id, qq.question_id
+    ORDER BY q.created_at, qq.question_number
+
+  """
+
+  df = Exqlite.query!(conn, query, [])
+
+  Kino.Frame.render(frame, df)
+end)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+#PID<0.1338.0>
+```
+
+```elixir
+%{conn: conn, database_path: database_path} = MonitoringTools.RenderAfter.get_state()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%{conn: #PID<0.1333.0>, database_path: "2024_04_21_08_16_47.db"}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+...
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+old kino process deleted.: :ok
+```
+
+```elixir
+# query = """
+# SELECT COUNT(*) AS num_students
+# FROM user_quiz_response
+# INNER JOIN quiz ON user_quiz_response.quiz_id = quiz.id
+# WHERE created_at = (SELECT MAX(updated_at) FROM quiz)
+# GROUP BY quiz.id
+# """
+
+#   df  = Exqlite.query!(conn, query, [])
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+nil
+```
+
+```elixir
+# query = """
+# SELECT 
+#     u.telegram_id,
+#     SUBSTR(q.short_description, 1, 9) AS day,
+#     qq.question_number as q_num,
+#     COUNT(uqr.id) AS attempts
+# FROM user_quiz_response uqr
+# JOIN question q ON uqr.question_id = q.id
+# JOIN users u ON uqr.user_id = u.id
+# JOIN quiz_questions qq ON q.id = qq.question_id AND uqr.quiz_id = qq.quiz_id
+# WHERE uqr.quiz_id != '6d3d5600-6c11-46c0-acc5-2d3cc422313a'
+# GROUP BY u.telegram_id, q.short_description, qq.question_number
+# HAVING COUNT(uqr.id) > 1;
+# """
+
+# Exqlite.query!(conn, query, [])
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+nil
+```
+
+```elixir
+# Kino.Markdown.new("""
+# ### Total Unique Students
+
+# """)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+nil
+```
+
+```elixir
+# # query = """
+# # SELECT 
+# #     u.telegram_id,
+# #     SUBSTR(uqr.quiz_id, 1, 8) AS quiz_id,
+# #     COUNT(DISTINCT uqr.question_id) AS solved_qs,
+# #     (SELECT COUNT(*) FROM quiz_questions qq WHERE qq.quiz_id = uqr.quiz_id) AS total_questions_in_quiz
+# # FROM user_quiz_response uqr
+# # JOIN users u ON uqr.user_id = u.id
+# # GROUP BY u.telegram_id, uqr.quiz_id;
+# # """
+
+# query = """
+# SELECT 
+#     u.telegram_id,
+#     uqr.quiz_id,
+#     COUNT(DISTINCT uqr.question_id) AS questions_solved
+# FROM user_quiz_response uqr
+# JOIN users u ON uqr.user_id = u.id
+# GROUP BY u.telegram_id, uqr.quiz_id
+# HAVING questions_solved >= 9
+# ORDER BY questions_solved DESC;
+# """
+# Exqlite.query!(conn, query, [])
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+nil
+```
+
+<!-- livebook:{"offset":39984,"stamp":{"token":"XCP.rTpImG2ZzMhtfl-rDJguX21G26m4E--soSjpIJ2xmVa7Ztxa1yBISq8qWwhI0xi5KbqLcILxFZ5G9Y6Uip7MPkDNcA2kmb9uRrwEv3ZhqShjdk5StP7M8P3KXFILlPgqI4d8fyjOC34hft_aH8Vac6lxWqavwS0if30PaUMOXKP26GYLhnv3jZ8s5OeYX_Dehj1tx_anwMYrt2VNK4HrVN2rdPW4wvyau8TyaYCLYggt_Pmy0vs2MvjoBfJU","version":2}} -->

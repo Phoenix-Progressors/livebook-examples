@@ -1,0 +1,68 @@
+# delit
+
+## Section
+
+<!-- livebook:{"disable_formatting":true} -->
+
+```elixir
+# defmodule H do 
+#   def get_in(data, keys)  do 
+
+#     new_keys = Enum.map(keys, fn 
+#       key when is_integer(key) -> Access.at(key) 
+#       key  -> Access.key(key) 
+#       end)
+
+#     Kernel.get_in(data, new_keys)
+#   end
+
+  
+# end
+```
+
+```elixir
+defmodule Helpers do
+  def get_by(%{} = map_or_struct, val) when not is_list(val) do
+    get_by(map_or_struct, [val])
+  end
+
+  def get_by(%{} = map_or_struct, keys) do
+    Kernel.get_in(map_or_struct, Enum.map(keys, &Access.key/1))
+  end
+end
+```
+
+```elixir
+defmodule H.Module do
+  defstruct [:name, :age]
+end
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+struct_inside_map = %{
+  1 => %H.Module{name: "MEEE", age: 1},
+  2 => %H.Module{name: "not meee", age: 22}
+}
+```
+
+```elixir
+Helpers.get_by(struct_inside_map, [1, :name])
+```
+
+```elixir
+Helpers.get_by(struct_inside_map, [1, :does_not_exist, :as])
+```
+
+```elixir
+struct_inside_map[1][:name]
+```
+
+```elixir
+struct_inside_map[1].name
+```
+
+```elixir
+struct_inside_map[0].name
+```

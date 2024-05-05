@@ -1,0 +1,1201 @@
+<!-- livebook:{"app_settings":{"auto_shutdown_ms":3600000,"output_type":"rich","slug":"edsarthi-subscriber","zero_downtime":true},"persist_outputs":true} -->
+
+# edsarthi subscribers
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.12.3"},
+  {:vega_lite, "~> 0.1.8"},
+  {:csv, "~> 3.2"},
+  {:explorer, "~> 0.8.0"},
+  {:kino_explorer, "~> 0.1.18"},
+  {:tzdata, "~> 1.0.1"},
+  {:req, "~> 0.4.13"},
+  {:floki, "~> 0.35.4"}
+
+  # {:csvlixir, "~> 2.0"}
+])
+```
+
+## Section
+
+```elixir
+defmodule H do
+  def url, do: "https://t.me/SarrthiMentorship"
+
+  def subscribers([]), do: subscribers(url: url())
+
+  def subscribers(url: url) do
+    %{body: body} = Req.get!(url)
+
+    Floki.parse_document!(body)
+    |> Floki.find(".tgme_page_extra")
+    |> Floki.text()
+  end
+
+  def update_csv(name \\ "edsarthi.csv", opts \\ []) do
+    content =
+      [[subscribers(opts), DateTime.utc_now() |> DateTime.to_string()]]
+      |> CSV.encode()
+      |> Enum.to_list()
+
+    content |> IO.inspect(label: "content")
+    File.write!(name, content, [:append])
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, H, <<70, 79, 82, 49, 0, 0, 11, ...>>, {:update_csv, 2}}
+```
+
+```elixir
+defmodule Updater do
+  use GenServer, restart: :permanent
+
+  # Callbacks
+
+  def get(name) do
+    GenServer.call(name, :get)
+  end
+
+  @impl true
+  def init(%{filename: filename, url: url} = args) do
+    # initial_state = String.split(elements, ",", trim: true)
+    Process.send_after(self(), :poll, 10)
+    schedule_send()
+    {:ok, Map.merge(args, %{poll_count: 0})}
+  end
+
+  @impl true
+  def handle_info(:poll, %{poll_count: poll_count} = state) do
+    H.update_csv(state.filename, url: state.url)
+    {state.filename, state.url} |> IO.inspect(label: "counter: #{poll_count}")
+    schedule_send()
+    {:noreply, Map.merge(state, %{poll_count: poll_count + 1})}
+  end
+
+  def handle_call(:get, from, state) do
+    {:reply, state, state}
+  end
+
+  def schedule_send(), do: Process.send_after(self(), :poll, 300 * 1000)
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+warning: variable "filename" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  edsarthi_dashboard.livemd#cell:wbtdhqmx2nokc3ov:11: Updater.init/1
+
+warning: variable "url" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  edsarthi_dashboard.livemd#cell:wbtdhqmx2nokc3ov:11: Updater.init/1
+
+warning: variable "from" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  edsarthi_dashboard.livemd#cell:wbtdhqmx2nokc3ov:26: Updater.handle_call/3
+
+warning: module attribute @impl was not set for function handle_call/3 callback (specified in GenServer). This either means you forgot to add the "@impl true" annotation before the definition or that you are accidentally overriding this callback
+  edsarthi_dashboard.livemd#cell:wbtdhqmx2nokc3ov:26: Updater (module)
+
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Updater, <<70, 79, 82, 49, 0, 0, 20, ...>>, {:schedule_send, 0}}
+```
+
+```elixir
+if Process.whereis(:edsarthi) do
+  GenServer.stop(Updater)
+end
+
+{:ok, pid} =
+  GenServer.start_link(
+    Updater,
+    %{filename: "edsarthi_channel.csv", url: "https://t.me/SarrthiMentorship"},
+    name: :edsarthi
+  )
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok, #PID<0.2762.0>}
+```
+
+```elixir
+
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+nil
+```
+
+```elixir
+Calendar.put_time_zone_database(Tzdata.TimeZoneDatabase)
+# config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:ok
+```
+
+```elixir
+button = Kino.Control.button("TG Subscribers")
+```
+
+```elixir
+frame = Kino.Frame.new()
+```
+
+```elixir
+Kino.listen(button, fn _event ->
+  Kino.Frame.clear(frame)
+  require Explorer.DataFrame
+  # list = File.stream!("pmfias_channel.csv") 
+  # |> CSV.decode!
+  # # |> IO.inspect()
+  # |> Enum.to_list()
+  # |> Enum.map(fn [k,v] -> 
+  # %{subscribers: k, timestamp: v}  
+
+  #  end)
+
+  df =
+    Explorer.DataFrame.from_csv!("edsarthi_channel.csv", header: false)
+    # |> Explorer.DataFrame.distinct(["column_1"], keep_all: true)
+    |> Explorer.DataFrame.group_by(["column_1"])
+
+  #   |> Explorer.DataFrame.aggregate([
+  #   first_column2: Explorer.DataFrame.select(df, "column_2"),
+  #   last_column2: Explorer.DataFrame.select(df, "column_2")
+  # ])
+
+  # |> Explorer.DataFrame.mutate_with(fn data -> 
+  # [column_3: ]
+  # end )
+  # Explorer.DataFrame.put(df, :date_column, Explorer.Series.transform(df["column_2"], &Utils.parse_datetime/1 ))
+  Kino.Frame.render(frame, df)
+  # import Kino.Shorts
+  # data_table(list)
+end)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+#PID<0.2765.0>
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+...
+counter: 6061: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 05:38:07.357709Z\r\n"]
+counter: 6062: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 05:43:04.514761Z\r\n"]
+counter: 6063: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 05:43:07.382718Z\r\n"]
+counter: 6064: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 05:48:04.542205Z\r\n"]
+counter: 6065: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 05:48:07.412493Z\r\n"]
+counter: 6066: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 05:53:04.566477Z\r\n"]
+counter: 6067: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 05:53:07.438983Z\r\n"]
+counter: 6068: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 05:58:04.590539Z\r\n"]
+counter: 6069: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 05:58:07.463358Z\r\n"]
+counter: 6070: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:03:04.614831Z\r\n"]
+counter: 6071: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:03:07.488263Z\r\n"]
+counter: 6072: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:08:04.639032Z\r\n"]
+counter: 6073: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:08:07.512625Z\r\n"]
+counter: 6074: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:13:04.665170Z\r\n"]
+counter: 6075: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:13:07.539507Z\r\n"]
+counter: 6076: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:18:04.694824Z\r\n"]
+counter: 6077: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:18:07.566005Z\r\n"]
+counter: 6078: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:23:04.772832Z\r\n"]
+counter: 6079: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:23:07.590801Z\r\n"]
+counter: 6080: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:28:04.802051Z\r\n"]
+counter: 6081: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:28:07.617040Z\r\n"]
+counter: 6082: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:33:04.825233Z\r\n"]
+counter: 6083: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:33:07.646009Z\r\n"]
+counter: 6084: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:38:04.851476Z\r\n"]
+counter: 6085: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:38:07.680319Z\r\n"]
+counter: 6086: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:43:04.884008Z\r\n"]
+counter: 6087: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:43:07.711935Z\r\n"]
+counter: 6088: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:48:04.925258Z\r\n"]
+counter: 6089: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:48:07.742453Z\r\n"]
+counter: 6090: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:53:04.966221Z\r\n"]
+counter: 6091: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:53:07.771437Z\r\n"]
+counter: 6092: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:58:04.995694Z\r\n"]
+counter: 6093: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 06:58:07.799363Z\r\n"]
+counter: 6094: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 07:03:05.025653Z\r\n"]
+counter: 6095: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 07:03:07.827561Z\r\n"]
+counter: 6096: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 07:08:05.057652Z\r\n"]
+counter: 6097: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 07:08:07.888127Z\r\n"]
+counter: 6098: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 07:13:05.080908Z\r\n"]
+counter: 6099: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 07:13:07.918621Z\r\n"]
+counter: 6100: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 07:18:05.106852Z\r\n"]
+counter: 6101: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 07:18:07.947045Z\r\n"]
+counter: 6102: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 07:23:05.135189Z\r\n"]
+counter: 6103: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 07:23:07.971668Z\r\n"]
+counter: 6104: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 07:28:05.165983Z\r\n"]
+counter: 6105: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 07:28:07.994670Z\r\n"]
+counter: 6106: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 07:33:05.198185Z\r\n"]
+counter: 6107: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 07:33:08.024875Z\r\n"]
+counter: 6108: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 07:38:05.235290Z\r\n"]
+counter: 6109: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 07:38:08.061932Z\r\n"]
+counter: 6110: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 07:43:05.264873Z\r\n"]
+counter: 6111: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 07:43:08.092483Z\r\n"]
+counter: 6112: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 07:48:05.297578Z\r\n"]
+counter: 6113: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 07:48:08.117675Z\r\n"]
+counter: 6114: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 07:53:05.333352Z\r\n"]
+counter: 6115: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 07:53:08.144383Z\r\n"]
+counter: 6116: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 07:58:05.366864Z\r\n"]
+counter: 6117: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 07:58:08.175171Z\r\n"]
+counter: 6118: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 08:03:05.393229Z\r\n"]
+counter: 6119: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 08:03:08.197745Z\r\n"]
+counter: 6120: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 845 subscribers,2024-03-24 08:08:05.416921Z\r\n"]
+counter: 6121: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 845 subscribers,2024-03-24 08:08:08.228530Z\r\n"]
+counter: 6122: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 845 subscribers,2024-03-24 08:13:05.446298Z\r\n"]
+counter: 6123: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 845 subscribers,2024-03-24 08:13:08.266333Z\r\n"]
+counter: 6124: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 845 subscribers,2024-03-24 08:18:05.473814Z\r\n"]
+counter: 6125: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 845 subscribers,2024-03-24 08:18:08.296017Z\r\n"]
+counter: 6126: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 845 subscribers,2024-03-24 08:23:05.512716Z\r\n"]
+counter: 6127: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 845 subscribers,2024-03-24 08:23:08.350454Z\r\n"]
+counter: 6128: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 845 subscribers,2024-03-24 08:28:05.537116Z\r\n"]
+counter: 6129: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 845 subscribers,2024-03-24 08:28:08.379001Z\r\n"]
+counter: 6130: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 845 subscribers,2024-03-24 08:33:05.574485Z\r\n"]
+counter: 6131: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 845 subscribers,2024-03-24 08:33:08.411890Z\r\n"]
+counter: 6132: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 08:38:05.602567Z\r\n"]
+counter: 6133: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 08:38:08.439666Z\r\n"]
+counter: 6134: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 08:43:05.633651Z\r\n"]
+counter: 6135: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 08:43:08.464744Z\r\n"]
+counter: 6136: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 08:48:05.665956Z\r\n"]
+counter: 6137: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 08:48:08.494465Z\r\n"]
+counter: 6138: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 08:53:05.696364Z\r\n"]
+counter: 6139: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 08:53:08.524905Z\r\n"]
+counter: 6140: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 08:58:05.720708Z\r\n"]
+counter: 6141: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 08:58:08.550971Z\r\n"]
+counter: 6142: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:03:05.753114Z\r\n"]
+counter: 6143: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:03:08.575006Z\r\n"]
+counter: 6144: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:08:05.780559Z\r\n"]
+counter: 6145: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:08:08.615307Z\r\n"]
+counter: 6146: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:13:05.824716Z\r\n"]
+counter: 6147: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:13:08.650093Z\r\n"]
+counter: 6148: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:18:05.852327Z\r\n"]
+counter: 6149: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:18:08.680102Z\r\n"]
+counter: 6150: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:23:05.881418Z\r\n"]
+counter: 6151: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:23:08.709581Z\r\n"]
+counter: 6152: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:28:05.913926Z\r\n"]
+counter: 6153: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:28:08.743765Z\r\n"]
+counter: 6154: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:33:05.939370Z\r\n"]
+counter: 6155: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:33:08.770441Z\r\n"]
+counter: 6156: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:38:05.996292Z\r\n"]
+counter: 6157: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:38:08.798240Z\r\n"]
+counter: 6158: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:43:06.028840Z\r\n"]
+counter: 6159: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:43:08.820205Z\r\n"]
+counter: 6160: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:48:06.053878Z\r\n"]
+counter: 6161: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:48:08.848737Z\r\n"]
+counter: 6162: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:53:06.121678Z\r\n"]
+counter: 6163: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:53:08.886119Z\r\n"]
+counter: 6164: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:58:06.149745Z\r\n"]
+counter: 6165: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 09:58:08.916280Z\r\n"]
+counter: 6166: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:03:06.176648Z\r\n"]
+counter: 6167: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:03:08.973019Z\r\n"]
+counter: 6168: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:08:06.208430Z\r\n"]
+counter: 6169: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:08:09.005897Z\r\n"]
+counter: 6170: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:13:06.250150Z\r\n"]
+counter: 6171: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:13:09.032971Z\r\n"]
+counter: 6172: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:18:06.284075Z\r\n"]
+counter: 6173: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:18:09.058061Z\r\n"]
+counter: 6174: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:23:06.313126Z\r\n"]
+counter: 6175: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:23:09.082985Z\r\n"]
+counter: 6176: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:28:06.341995Z\r\n"]
+counter: 6177: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:28:09.110324Z\r\n"]
+counter: 6178: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:33:06.418319Z\r\n"]
+counter: 6179: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:33:09.136856Z\r\n"]
+counter: 6180: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:38:06.447690Z\r\n"]
+counter: 6181: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:38:09.170944Z\r\n"]
+counter: 6182: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:43:06.476735Z\r\n"]
+counter: 6183: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:43:09.196099Z\r\n"]
+counter: 6184: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:48:06.506117Z\r\n"]
+counter: 6185: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:48:09.223760Z\r\n"]
+counter: 6186: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:53:06.534145Z\r\n"]
+counter: 6187: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:53:09.250766Z\r\n"]
+counter: 6188: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:58:06.564525Z\r\n"]
+counter: 6189: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 10:58:09.274196Z\r\n"]
+counter: 6190: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:03:06.594952Z\r\n"]
+counter: 6191: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:03:09.311342Z\r\n"]
+counter: 6192: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:08:06.631146Z\r\n"]
+counter: 6193: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:08:09.352489Z\r\n"]
+counter: 6194: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:13:06.662551Z\r\n"]
+counter: 6195: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:13:09.390731Z\r\n"]
+counter: 6196: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:18:07.134534Z\r\n"]
+counter: 6197: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:18:09.419107Z\r\n"]
+counter: 6198: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:23:07.180474Z\r\n"]
+counter: 6199: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:23:09.446436Z\r\n"]
+counter: 6200: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:28:07.212793Z\r\n"]
+counter: 6201: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:28:09.494702Z\r\n"]
+counter: 6202: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:33:07.246580Z\r\n"]
+counter: 6203: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:33:09.522873Z\r\n"]
+counter: 6204: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:38:07.278319Z\r\n"]
+counter: 6205: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:38:09.567316Z\r\n"]
+counter: 6206: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:43:07.307272Z\r\n"]
+counter: 6207: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:43:09.600719Z\r\n"]
+counter: 6208: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:48:07.342384Z\r\n"]
+counter: 6209: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:48:09.628892Z\r\n"]
+counter: 6210: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:53:07.378921Z\r\n"]
+counter: 6211: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 11:53:09.658569Z\r\n"]
+counter: 6212: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 11:58:07.413010Z\r\n"]
+counter: 6213: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 11:58:09.689246Z\r\n"]
+counter: 6214: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 12:03:07.441943Z\r\n"]
+counter: 6215: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 12:03:09.721400Z\r\n"]
+counter: 6216: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 12:08:07.471611Z\r\n"]
+counter: 6217: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 12:08:09.750651Z\r\n"]
+counter: 6218: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 12:13:07.514172Z\r\n"]
+counter: 6219: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 12:13:09.775697Z\r\n"]
+counter: 6220: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 12:18:07.565806Z\r\n"]
+counter: 6221: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 12:18:09.808437Z\r\n"]
+counter: 6222: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 12:23:07.598280Z\r\n"]
+counter: 6223: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 12:23:09.838020Z\r\n"]
+counter: 6224: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 12:28:07.637383Z\r\n"]
+counter: 6225: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 12:28:09.872737Z\r\n"]
+counter: 6226: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 12:33:07.669672Z\r\n"]
+counter: 6227: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 12:33:09.898028Z\r\n"]
+counter: 6228: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 12:38:07.697662Z\r\n"]
+counter: 6229: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 12:38:09.927533Z\r\n"]
+counter: 6230: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 12:43:07.731816Z\r\n"]
+counter: 6231: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 12:43:09.957670Z\r\n"]
+counter: 6232: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 12:48:07.762285Z\r\n"]
+counter: 6233: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 12:48:09.985286Z\r\n"]
+counter: 6234: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 12:53:07.798707Z\r\n"]
+counter: 6235: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 12:53:10.011783Z\r\n"]
+counter: 6236: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 12:58:07.825334Z\r\n"]
+counter: 6237: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 12:58:10.038938Z\r\n"]
+counter: 6238: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 13:03:07.855596Z\r\n"]
+counter: 6239: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 13:03:10.067995Z\r\n"]
+counter: 6240: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 13:08:07.881115Z\r\n"]
+counter: 6241: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 13:08:10.098745Z\r\n"]
+counter: 6242: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 13:13:07.913577Z\r\n"]
+counter: 6243: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 13:13:10.128996Z\r\n"]
+counter: 6244: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 13:18:07.944909Z\r\n"]
+counter: 6245: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 13:18:10.157970Z\r\n"]
+counter: 6246: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 13:23:07.984367Z\r\n"]
+counter: 6247: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 13:23:10.205811Z\r\n"]
+counter: 6248: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 13:28:08.012742Z\r\n"]
+counter: 6249: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 13:28:10.232244Z\r\n"]
+counter: 6250: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 13:33:08.044532Z\r\n"]
+counter: 6251: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 13:33:10.278261Z\r\n"]
+counter: 6252: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 13:38:08.071830Z\r\n"]
+counter: 6253: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 13:38:10.350170Z\r\n"]
+counter: 6254: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 13:43:08.110281Z\r\n"]
+counter: 6255: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 13:43:10.386839Z\r\n"]
+counter: 6256: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 13:48:08.137088Z\r\n"]
+counter: 6257: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 846 subscribers,2024-03-24 13:48:10.413977Z\r\n"]
+counter: 6258: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 13:53:08.173596Z\r\n"]
+counter: 6259: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 13:53:10.440922Z\r\n"]
+counter: 6260: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 13:58:08.203720Z\r\n"]
+counter: 6261: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 13:58:10.476052Z\r\n"]
+counter: 6262: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:03:08.238394Z\r\n"]
+counter: 6263: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:03:10.504615Z\r\n"]
+counter: 6264: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:08:08.277202Z\r\n"]
+counter: 6265: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:08:10.541086Z\r\n"]
+counter: 6266: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:13:08.308730Z\r\n"]
+counter: 6267: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:13:10.567700Z\r\n"]
+counter: 6268: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:18:08.336572Z\r\n"]
+counter: 6269: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:18:10.598814Z\r\n"]
+counter: 6270: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:23:08.367600Z\r\n"]
+counter: 6271: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:23:10.626789Z\r\n"]
+counter: 6272: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:28:08.399988Z\r\n"]
+counter: 6273: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:28:10.661027Z\r\n"]
+counter: 6274: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:33:08.430122Z\r\n"]
+counter: 6275: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:33:10.700066Z\r\n"]
+counter: 6276: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:38:08.454241Z\r\n"]
+counter: 6277: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:38:10.735914Z\r\n"]
+counter: 6278: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:43:08.531756Z\r\n"]
+counter: 6279: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:43:10.765260Z\r\n"]
+counter: 6280: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:48:08.560116Z\r\n"]
+counter: 6281: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:48:10.790423Z\r\n"]
+counter: 6282: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:53:08.586067Z\r\n"]
+counter: 6283: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:53:10.818954Z\r\n"]
+counter: 6284: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:58:08.616094Z\r\n"]
+counter: 6285: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 14:58:10.845085Z\r\n"]
+counter: 6286: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 15:03:08.641782Z\r\n"]
+counter: 6287: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 847 subscribers,2024-03-24 15:03:10.875478Z\r\n"]
+counter: 6288: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 15:08:08.669154Z\r\n"]
+counter: 6289: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 15:08:10.900559Z\r\n"]
+counter: 6290: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 15:13:08.700351Z\r\n"]
+counter: 6291: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 15:13:10.925857Z\r\n"]
+counter: 6292: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 15:18:08.724169Z\r\n"]
+counter: 6293: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 15:18:10.951050Z\r\n"]
+counter: 6294: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 15:23:08.750980Z\r\n"]
+counter: 6295: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 15:23:10.974204Z\r\n"]
+counter: 6296: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 15:28:08.783173Z\r\n"]
+counter: 6297: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 15:28:11.003719Z\r\n"]
+counter: 6298: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 15:33:08.810430Z\r\n"]
+counter: 6299: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 15:33:11.030956Z\r\n"]
+counter: 6300: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 15:38:08.836403Z\r\n"]
+counter: 6301: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 848 subscribers,2024-03-24 15:38:11.057309Z\r\n"]
+counter: 6302: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 15:43:08.865121Z\r\n"]
+counter: 6303: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 15:43:11.087554Z\r\n"]
+counter: 6304: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 15:48:08.889561Z\r\n"]
+counter: 6305: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 15:48:11.114138Z\r\n"]
+counter: 6306: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 15:53:08.916669Z\r\n"]
+counter: 6307: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 15:53:11.139143Z\r\n"]
+counter: 6308: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 15:58:08.947013Z\r\n"]
+counter: 6309: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 15:58:11.163390Z\r\n"]
+counter: 6310: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:03:08.976744Z\r\n"]
+counter: 6311: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:03:11.187714Z\r\n"]
+counter: 6312: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:08:09.003964Z\r\n"]
+counter: 6313: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:08:11.212694Z\r\n"]
+counter: 6314: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:13:09.038256Z\r\n"]
+counter: 6315: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:13:11.241302Z\r\n"]
+counter: 6316: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:18:09.066986Z\r\n"]
+counter: 6317: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:18:11.268246Z\r\n"]
+counter: 6318: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:23:09.098062Z\r\n"]
+counter: 6319: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:23:11.297164Z\r\n"]
+counter: 6320: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:28:09.127027Z\r\n"]
+counter: 6321: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:28:11.323165Z\r\n"]
+counter: 6322: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:33:09.154633Z\r\n"]
+counter: 6323: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:33:11.347131Z\r\n"]
+counter: 6324: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:38:09.190747Z\r\n"]
+counter: 6325: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:38:11.372146Z\r\n"]
+counter: 6326: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:43:09.216932Z\r\n"]
+counter: 6327: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:43:11.395758Z\r\n"]
+counter: 6328: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:48:09.249350Z\r\n"]
+counter: 6329: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:48:11.425464Z\r\n"]
+counter: 6330: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:53:09.277272Z\r\n"]
+counter: 6331: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:53:11.448106Z\r\n"]
+counter: 6332: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:58:09.306599Z\r\n"]
+counter: 6333: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 16:58:11.475216Z\r\n"]
+counter: 6334: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:03:09.334015Z\r\n"]
+counter: 6335: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:03:11.500490Z\r\n"]
+counter: 6336: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:08:09.358256Z\r\n"]
+counter: 6337: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:08:11.526726Z\r\n"]
+counter: 6338: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:13:09.388430Z\r\n"]
+counter: 6339: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:13:11.551746Z\r\n"]
+counter: 6340: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:18:09.414062Z\r\n"]
+counter: 6341: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:18:11.576390Z\r\n"]
+counter: 6342: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:23:09.443770Z\r\n"]
+counter: 6343: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:23:11.604970Z\r\n"]
+counter: 6344: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:28:09.471612Z\r\n"]
+counter: 6345: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:28:11.630435Z\r\n"]
+counter: 6346: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:33:09.497783Z\r\n"]
+counter: 6347: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:33:11.657795Z\r\n"]
+counter: 6348: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:38:09.527379Z\r\n"]
+counter: 6349: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:38:11.682630Z\r\n"]
+counter: 6350: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:43:09.562660Z\r\n"]
+counter: 6351: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:43:11.709209Z\r\n"]
+counter: 6352: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:48:09.588167Z\r\n"]
+counter: 6353: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:48:11.733428Z\r\n"]
+counter: 6354: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:53:09.613132Z\r\n"]
+counter: 6355: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 849 subscribers,2024-03-24 17:53:11.757762Z\r\n"]
+counter: 6356: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 850 subscribers,2024-03-24 17:58:09.638455Z\r\n"]
+counter: 6357: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 850 subscribers,2024-03-24 17:58:11.782133Z\r\n"]
+counter: 6358: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 850 subscribers,2024-03-24 18:03:09.671001Z\r\n"]
+counter: 6359: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 850 subscribers,2024-03-24 18:03:11.813542Z\r\n"]
+counter: 6360: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:08:09.695040Z\r\n"]
+counter: 6361: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:08:11.841255Z\r\n"]
+counter: 6362: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:13:09.721490Z\r\n"]
+counter: 6363: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:13:11.869415Z\r\n"]
+counter: 6364: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:18:09.750077Z\r\n"]
+counter: 6365: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:18:11.894918Z\r\n"]
+counter: 6366: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:23:09.778926Z\r\n"]
+counter: 6367: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:23:11.919430Z\r\n"]
+counter: 6368: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:28:09.810655Z\r\n"]
+counter: 6369: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:28:11.944664Z\r\n"]
+counter: 6370: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:33:09.837294Z\r\n"]
+counter: 6371: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:33:11.973857Z\r\n"]
+counter: 6372: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:38:09.863245Z\r\n"]
+counter: 6373: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:38:11.999858Z\r\n"]
+counter: 6374: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:43:09.892788Z\r\n"]
+counter: 6375: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:43:12.032206Z\r\n"]
+counter: 6376: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:48:09.923590Z\r\n"]
+counter: 6377: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:48:12.056257Z\r\n"]
+counter: 6378: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:53:09.997507Z\r\n"]
+counter: 6379: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:53:12.079441Z\r\n"]
+counter: 6380: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:58:10.027861Z\r\n"]
+counter: 6381: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 18:58:12.104160Z\r\n"]
+counter: 6382: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:03:10.056110Z\r\n"]
+counter: 6383: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:03:12.130874Z\r\n"]
+counter: 6384: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:08:10.083155Z\r\n"]
+counter: 6385: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:08:12.158028Z\r\n"]
+counter: 6386: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:13:10.108508Z\r\n"]
+counter: 6387: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:13:12.181998Z\r\n"]
+counter: 6388: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:18:10.131569Z\r\n"]
+counter: 6389: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:18:12.205454Z\r\n"]
+counter: 6390: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:23:10.157652Z\r\n"]
+counter: 6391: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:23:12.235853Z\r\n"]
+counter: 6392: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:28:10.187363Z\r\n"]
+counter: 6393: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:28:12.260217Z\r\n"]
+counter: 6394: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:33:10.211792Z\r\n"]
+counter: 6395: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:33:12.285343Z\r\n"]
+counter: 6396: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:38:10.239565Z\r\n"]
+counter: 6397: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:38:12.307998Z\r\n"]
+counter: 6398: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:43:10.266155Z\r\n"]
+counter: 6399: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:43:12.334442Z\r\n"]
+counter: 6400: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:48:10.293088Z\r\n"]
+counter: 6401: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:48:12.361366Z\r\n"]
+counter: 6402: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:53:10.319007Z\r\n"]
+counter: 6403: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 851 subscribers,2024-03-24 19:53:12.384846Z\r\n"]
+counter: 6404: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 19:58:10.344830Z\r\n"]
+counter: 6405: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 19:58:12.409416Z\r\n"]
+counter: 6406: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:03:10.374351Z\r\n"]
+counter: 6407: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:03:12.431917Z\r\n"]
+counter: 6408: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:08:10.398388Z\r\n"]
+counter: 6409: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:08:12.460858Z\r\n"]
+counter: 6410: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:13:10.423378Z\r\n"]
+counter: 6411: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:13:12.490112Z\r\n"]
+counter: 6412: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:18:10.450314Z\r\n"]
+counter: 6413: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:18:12.513910Z\r\n"]
+counter: 6414: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:23:10.475705Z\r\n"]
+counter: 6415: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:23:12.538132Z\r\n"]
+counter: 6416: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:28:10.500566Z\r\n"]
+counter: 6417: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:28:12.591343Z\r\n"]
+counter: 6418: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:33:10.525778Z\r\n"]
+counter: 6419: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:33:12.619650Z\r\n"]
+counter: 6420: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:38:10.548485Z\r\n"]
+counter: 6421: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:38:12.646150Z\r\n"]
+counter: 6422: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:43:10.574380Z\r\n"]
+counter: 6423: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:43:12.674114Z\r\n"]
+counter: 6424: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:48:10.600998Z\r\n"]
+counter: 6425: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:48:12.700099Z\r\n"]
+counter: 6426: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:53:10.626394Z\r\n"]
+counter: 6427: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:53:12.725270Z\r\n"]
+counter: 6428: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:58:10.652710Z\r\n"]
+counter: 6429: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 20:58:12.747156Z\r\n"]
+counter: 6430: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:03:10.676948Z\r\n"]
+counter: 6431: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:03:12.769763Z\r\n"]
+counter: 6432: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:08:10.701083Z\r\n"]
+counter: 6433: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:08:12.796759Z\r\n"]
+counter: 6434: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:13:10.730494Z\r\n"]
+counter: 6435: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:13:12.824718Z\r\n"]
+counter: 6436: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:18:10.758652Z\r\n"]
+counter: 6437: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:18:12.847601Z\r\n"]
+counter: 6438: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:23:10.802141Z\r\n"]
+counter: 6439: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:23:12.871041Z\r\n"]
+counter: 6440: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:28:10.825835Z\r\n"]
+counter: 6441: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:28:12.896434Z\r\n"]
+counter: 6442: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:33:10.852610Z\r\n"]
+counter: 6443: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:33:12.925061Z\r\n"]
+counter: 6444: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:38:10.876203Z\r\n"]
+counter: 6445: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:38:12.957216Z\r\n"]
+counter: 6446: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:43:10.899888Z\r\n"]
+counter: 6447: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:43:12.981807Z\r\n"]
+counter: 6448: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:48:10.924728Z\r\n"]
+counter: 6449: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:48:13.015035Z\r\n"]
+counter: 6450: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:53:10.951917Z\r\n"]
+counter: 6451: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:53:13.037143Z\r\n"]
+counter: 6452: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:58:10.977545Z\r\n"]
+counter: 6453: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 21:58:13.060815Z\r\n"]
+counter: 6454: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:03:11.006621Z\r\n"]
+counter: 6455: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:03:13.085686Z\r\n"]
+counter: 6456: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:08:11.030598Z\r\n"]
+counter: 6457: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:08:13.109845Z\r\n"]
+counter: 6458: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:13:11.055444Z\r\n"]
+counter: 6459: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:13:13.133144Z\r\n"]
+counter: 6460: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:18:11.084496Z\r\n"]
+counter: 6461: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:18:13.157203Z\r\n"]
+counter: 6462: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:23:11.110312Z\r\n"]
+counter: 6463: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:23:13.178949Z\r\n"]
+counter: 6464: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:28:11.135139Z\r\n"]
+counter: 6465: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:28:13.202118Z\r\n"]
+counter: 6466: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:33:11.159937Z\r\n"]
+counter: 6467: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:33:13.224116Z\r\n"]
+counter: 6468: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:38:11.186638Z\r\n"]
+counter: 6469: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:38:13.250209Z\r\n"]
+counter: 6470: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:43:11.212180Z\r\n"]
+counter: 6471: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:43:13.273171Z\r\n"]
+counter: 6472: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:48:11.239072Z\r\n"]
+counter: 6473: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:48:13.295545Z\r\n"]
+counter: 6474: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:53:11.265278Z\r\n"]
+counter: 6475: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:53:13.324161Z\r\n"]
+counter: 6476: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:58:11.287608Z\r\n"]
+counter: 6477: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 22:58:13.348901Z\r\n"]
+counter: 6478: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:03:11.362165Z\r\n"]
+counter: 6479: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:03:13.374504Z\r\n"]
+counter: 6480: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:08:11.385165Z\r\n"]
+counter: 6481: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:08:13.401085Z\r\n"]
+counter: 6482: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:13:11.420821Z\r\n"]
+counter: 6483: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:13:13.446741Z\r\n"]
+counter: 6484: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:18:11.444048Z\r\n"]
+counter: 6485: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:18:13.478723Z\r\n"]
+counter: 6486: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:23:11.473209Z\r\n"]
+counter: 6487: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:23:13.501348Z\r\n"]
+counter: 6488: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:28:11.504675Z\r\n"]
+counter: 6489: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:28:13.525783Z\r\n"]
+counter: 6490: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:33:11.536210Z\r\n"]
+counter: 6491: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:33:13.555396Z\r\n"]
+counter: 6492: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:38:11.563145Z\r\n"]
+counter: 6493: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:38:13.577533Z\r\n"]
+counter: 6494: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:43:11.591085Z\r\n"]
+counter: 6495: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:43:13.603419Z\r\n"]
+counter: 6496: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:48:11.616379Z\r\n"]
+counter: 6497: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:48:13.628735Z\r\n"]
+counter: 6498: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:53:11.650925Z\r\n"]
+counter: 6499: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:53:13.652910Z\r\n"]
+counter: 6500: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:58:11.680761Z\r\n"]
+counter: 6501: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-24 23:58:13.691093Z\r\n"]
+counter: 6502: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:03:11.711238Z\r\n"]
+counter: 6503: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:03:13.713997Z\r\n"]
+counter: 6504: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:08:11.738910Z\r\n"]
+counter: 6505: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:08:13.743145Z\r\n"]
+counter: 6506: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:13:11.765875Z\r\n"]
+counter: 6507: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:13:13.769256Z\r\n"]
+counter: 6508: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:18:11.791333Z\r\n"]
+counter: 6509: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:18:13.790158Z\r\n"]
+counter: 6510: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:23:11.818361Z\r\n"]
+counter: 6511: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:23:13.811963Z\r\n"]
+counter: 6512: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:28:11.855177Z\r\n"]
+counter: 6513: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:28:13.837172Z\r\n"]
+counter: 6514: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:33:11.885995Z\r\n"]
+counter: 6515: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:33:13.865643Z\r\n"]
+counter: 6516: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:38:11.909883Z\r\n"]
+counter: 6517: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:38:13.891048Z\r\n"]
+counter: 6518: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:43:11.943143Z\r\n"]
+counter: 6519: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:43:13.916941Z\r\n"]
+counter: 6520: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:48:11.976307Z\r\n"]
+counter: 6521: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:48:13.942375Z\r\n"]
+counter: 6522: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:53:12.002230Z\r\n"]
+counter: 6523: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:53:13.972939Z\r\n"]
+counter: 6524: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:58:12.028079Z\r\n"]
+counter: 6525: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 00:58:14.000058Z\r\n"]
+counter: 6526: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:03:12.052996Z\r\n"]
+counter: 6527: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:03:14.026065Z\r\n"]
+counter: 6528: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:08:12.079523Z\r\n"]
+counter: 6529: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:08:14.048681Z\r\n"]
+counter: 6530: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:13:12.106449Z\r\n"]
+counter: 6531: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:13:14.070260Z\r\n"]
+counter: 6532: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:18:12.137177Z\r\n"]
+counter: 6533: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:18:14.097672Z\r\n"]
+counter: 6534: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:23:12.163648Z\r\n"]
+counter: 6535: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:23:14.121800Z\r\n"]
+counter: 6536: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:28:12.191866Z\r\n"]
+counter: 6537: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:28:14.153093Z\r\n"]
+counter: 6538: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:33:12.218524Z\r\n"]
+counter: 6539: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:33:14.181212Z\r\n"]
+counter: 6540: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:38:12.247054Z\r\n"]
+counter: 6541: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:38:14.231170Z\r\n"]
+counter: 6542: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:43:12.270915Z\r\n"]
+counter: 6543: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:43:14.261109Z\r\n"]
+counter: 6544: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:48:12.295440Z\r\n"]
+counter: 6545: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:48:14.286487Z\r\n"]
+counter: 6546: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:53:12.321003Z\r\n"]
+counter: 6547: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:53:14.315382Z\r\n"]
+counter: 6548: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:58:12.348337Z\r\n"]
+counter: 6549: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 01:58:14.340857Z\r\n"]
+counter: 6550: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 02:03:12.379297Z\r\n"]
+counter: 6551: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 02:03:14.364794Z\r\n"]
+counter: 6552: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 02:08:12.402791Z\r\n"]
+counter: 6553: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 02:08:14.399241Z\r\n"]
+counter: 6554: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 02:13:12.425788Z\r\n"]
+counter: 6555: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 02:13:14.423883Z\r\n"]
+counter: 6556: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 02:18:12.451252Z\r\n"]
+counter: 6557: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 02:18:14.448327Z\r\n"]
+counter: 6558: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 02:23:12.479514Z\r\n"]
+counter: 6559: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+content: ["17 852 subscribers,2024-03-25 02:23:14.487884Z\r\n"]
+counter: 6560: {"edsarthi_channel.csv", "https://t.me/SarrthiMentorship"}
+```
